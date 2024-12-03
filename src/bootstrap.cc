@@ -18,11 +18,12 @@ struct bootstrapNetComm {
 };
 
 /* Init functions */
-static char bootstrapNetIfNames[MAX_IF_NAME_SIZE*MAX_IFS];
-static union socketAddress bootstrapNetIfAddrs[MAX_IFS];
-static int bootstrapNetIfs = -1;
+static char bootstrapNetIfNames[MAX_IF_NAME_SIZE*MAX_IFS];  // todo: interface名字信息, MAX_IF_NAME_SIZE: 机器上interface最大名字长度, MAX_IFS: 最大interface个数.
+static union socketAddress bootstrapNetIfAddrs[MAX_IFS];    // todo: interface address信息(封装了底层的sockaddr类).
+static int bootstrapNetIfs = -1;                            // todo: 最后得到的interface个数.
 pthread_mutex_t bootstrapNetLock = PTHREAD_MUTEX_INITIALIZER;
 
+// todo: 返回所有interfaces.
 ncclResult_t bootstrapNetInit() {
   if (bootstrapNetIfs == -1) {
     pthread_mutex_lock(&bootstrapNetLock);
@@ -238,6 +239,7 @@ ncclResult_t bootstrapGetUniqueId(ncclUniqueId* id) {
   memset(id, 0, sizeof(ncclUniqueId));
   ncclNetHandle_t* netHandle = (ncclNetHandle_t*) id;
 
+	// todo: 先不考虑NCCL_COMM_ID的情况.
   char* env = getenv("NCCL_COMM_ID");
   if (env) {
     INFO(NCCL_ENV, "NCCL_COMM_ID set by environment to %s", env);

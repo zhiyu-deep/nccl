@@ -145,20 +145,20 @@ int parseStringList(const char* string, struct netIf* ifList, int maxList) {
   char c;
   do {
     c = *ptr;
-    if (c == ':') {
-      if (ifC > 0) {
+    if (c == ':') {  // todo: 解析到ip末尾, 带port.
+      if (ifC > 0) {  // todo: 收集解析到的ip, 1. prefix结束, 2. 获取:后面的port信息.
         ifList[ifNum].prefix[ifC] = '\0';
         ifList[ifNum].port = atoi(ptr+1);
         ifNum++; ifC = 0;
       }
-      while (c != ',' && c != '\0') c = *(++ptr);
-    } else if (c == ',' || c == '\0') {
+      while (c != ',' && c != '\0') c = *(++ptr);  // todo: 一直找到',', 表示当前ip解析结束; 末尾有ptr++, 会移动到新的ip位置.
+    } else if (c == ',' || c == '\0') {  // todo: 解析到ip末尾, 不带port; port取-1.
       if (ifC > 0) {
         ifList[ifNum].prefix[ifC] = '\0';
         ifList[ifNum].port = -1;
         ifNum++; ifC = 0;
       }
-    } else {
+    } else {  // todo: 收集有效内容.
       ifList[ifNum].prefix[ifC] = c;
       ifC++;
     }
@@ -167,9 +167,10 @@ int parseStringList(const char* string, struct netIf* ifList, int maxList) {
   return ifNum;
 }
 
+// todo: string是目标string, ref是指定的string, 判断是否匹配.
 static bool matchIf(const char* string, const char* ref, bool matchExact) {
   // Make sure to include '\0' in the exact case
-  int matchLen = matchExact ? strlen(string) + 1 : strlen(ref);
+  int matchLen = matchExact ? strlen(string) + 1 : strlen(ref);  // todo: matchExact, 则要求和目标string相同.
   return strncmp(string, ref, matchLen) == 0;
 }
 
@@ -180,7 +181,7 @@ static bool matchPort(const int port1, const int port2) {
   return false;
 }
 
-
+// todo: 判断ifList中prefix和目标ip string是否一致.
 bool matchIfList(const char* string, int port, struct netIf* ifList, int listSize, bool matchExact) {
   // Make an exception for the case where no user list is defined
   if (listSize == 0) return true;

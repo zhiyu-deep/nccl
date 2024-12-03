@@ -26,7 +26,7 @@ extern "C" {
 typedef struct ncclComm* ncclComm_t;
 
 #define NCCL_UNIQUE_ID_BYTES 128
-typedef struct { char internal[NCCL_UNIQUE_ID_BYTES]; } ncclUniqueId;
+typedef struct { char internal[NCCL_UNIQUE_ID_BYTES]; } ncclUniqueId;  // todo: 其实就是解析成net.h中的ncclNetHandle_t.
 
 /* Error type */
 typedef enum { ncclSuccess                 =  0,

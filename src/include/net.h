@@ -11,7 +11,7 @@
 #include "nccl_net.h"
 
 extern ncclNet_t* ncclNet;
-typedef char ncclNetHandle_t[NCCL_NET_HANDLE_MAXSIZE];
+typedef char ncclNetHandle_t[NCCL_NET_HANDLE_MAXSIZE];  // todo: 其实就是解析成socket.h中的socketAddress.
 
 // Translation to external API
 static const char* ncclNetName() { return ncclNet->name; }

@@ -4,6 +4,7 @@
 #include "mpi.h"
 #include <unistd.h>
 #include <stdint.h>
+#include "string"
 
 
 #define MPICHECK(cmd) do {                          \

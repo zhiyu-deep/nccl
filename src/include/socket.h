@@ -22,9 +22,10 @@
 #define RETRY_REFUSED_TIMES   2e4 // connection refused retry times before reporting a timeout (20 sec)
 #define RETRY_TIMEDOUT_TIMES    3 // connection timed out retry times (each one can take 20s)
 
+// todo: 封装了底层的sockaddr类.
 /* Common socket address storage structure for IPv4/IPv6 */
 union socketAddress {
-  struct sockaddr sa;
+  struct sockaddr sa;         // todo: sockaddr可以理解为sockaddr_in和sockaddr_in6的基类.
   struct sockaddr_in sin;
   struct sockaddr_in6 sin6;
 };
@@ -46,6 +47,7 @@ static inline uint16_t socketToPort(struct sockaddr *saddr) {
   return ntohs(saddr->sa_family == AF_INET ? ((struct sockaddr_in*)saddr)->sin_port : ((struct sockaddr_in6*)saddr)->sin6_port);
 }
 
+// todo: 根据环境变量确定, 选择使用ipv4还是ipv6, 默认=-1.
 /* Allow the user to force the IPv4/IPv6 interface selection */
 static inline int envSocketFamily(void) {
   int family = -1; // Family selection is not forced, will use first one found
@@ -62,20 +64,24 @@ static inline int envSocketFamily(void) {
   return family;
 }
 
+// todo: 返回所有有效address, 注意: 匹配的时候, port不会匹配, 只匹配interface name.
+//  input: prefixList, interface规则; sock_family, 指定family; maxIfNameSize, 指定interface最大长度; maxIfs, 指定最多interfaces.
+//	output: names, 保存interface names; addrs, 保存interface address对象.
 static int findInterfaces(const char* prefixList, char* names, union socketAddress *addrs, int sock_family, int maxIfNameSize, int maxIfs) {
 #ifdef ENABLE_TRACE
   char line[1024];
 #endif
   struct netIf userIfs[MAX_IFS];
-  bool searchNot = prefixList && prefixList[0] == '^';
+  bool searchNot = prefixList && prefixList[0] == '^';  // todo: ^符号, 表示取反.
   if (searchNot) prefixList++;
-  bool searchExact = prefixList && prefixList[0] == '=';
+  bool searchExact = prefixList && prefixList[0] == '=';  // todo: =符号, 表示完整匹配.
   if (searchExact) prefixList++;
+	// todo: 将prefixList中内容解析到netIf.
   int nUserIfs = parseStringList(prefixList, userIfs, MAX_IFS);
 
   int found = 0;
   struct ifaddrs *interfaces, *interface;
-  getifaddrs(&interfaces);
+  getifaddrs(&interfaces);  // todo: 底层获取所有的interface(prefix + port).
   for (interface = interfaces; interface && found < maxIfs; interface = interface->ifa_next) {
     if (interface->ifa_addr == NULL) continue;
 
@@ -96,6 +102,7 @@ static int findInterfaces(const char* prefixList, char* names, union socketAddre
       if (IN6_IS_ADDR_LOOPBACK(&sa->sin6_addr)) continue;
     }
 
+		// todo: 此处的-1表示port不要求匹配, 只用匹配prefix.
     // check against user specified interfaces
     if (!(matchIfList(interface->ifa_name, -1, userIfs, nUserIfs, searchExact) ^ searchNot)) {
       continue;
@@ -284,13 +291,14 @@ static ncclResult_t GetSocketAddrFromString(union socketAddress* ua, const char*
   return ncclSuccess;
 }
 
+// todo: 按照一定顺序, 返回interface names和address.
 static int findInterfaces(char* ifNames, union socketAddress *ifAddrs, int ifNameMaxSize, int maxIfs) {
   static int shownIfName = 0;
   int nIfs = 0;
   // Allow user to force the INET socket family selection
-  int sock_family = envSocketFamily();
+  int sock_family = envSocketFamily();  // todo: 选择使用ipv4还是ipv6.
   // User specified interface
-  char* env = getenv("NCCL_SOCKET_IFNAME");
+  char* env = getenv("NCCL_SOCKET_IFNAME");  // todo: env中指定的interface信息.
   if (env && strlen(env) > 1) {
     INFO(NCCL_ENV, "NCCL_SOCKET_IFNAME set by environment to %s", env);
     // Specified by user : find or fail
