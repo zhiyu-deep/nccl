@@ -57,8 +57,6 @@ struct ncclRecvMem {
 };
 
 struct ncclComm {
-  struct ncclChannel channels[MAXCHANNELS];
-
   struct ncclPeerInfo* peerInfo;
   struct ncclTopoSystem* topo;
 
@@ -128,11 +126,13 @@ struct ncclComm {
   int* intraCGMode; // Whether we can use CUDA9 CGMD or not
   int* intraCC; // Only to check all have the same ComputeCap and disable CGMode if not
   struct ncclColl args;
-  void* argsptr;
+  void* argsptr; // todo: argsptr = &args.
 
   // Global proxy thread
   pthread_t proxyThread;
   struct ncclProxyState proxyState;
+
+  struct ncclChannel channels[MAXCHANNELS];
 
   // Whether this communicator uses collNet
   int collNetSupport;

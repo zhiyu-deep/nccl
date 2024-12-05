@@ -225,8 +225,10 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   TRACE(NCCL_INIT,"comm %p rank %d nranks %d cudaDev %d busId %x", comm, rank, ndev, comm->cudaDev, comm->busId);
 
   comm->doneEvent = doneEvent;
+  // todo: 读取env中的check pointer信息, 决定是否check pointers.
   comm->checkPointers = ncclParamCheckPointers() == 1 ? true : false;
 #if CUDART_VERSION >= 9020
+  // todo: 读取env中的groupCudaStream信息, 决定是否启动1.
   comm->groupCudaStream = ncclParamGroupCudaStream();
 #else
   // Don't allow the user to overload the default setting in older CUDA builds
@@ -857,6 +859,7 @@ static ncclResult_t ncclCommInitRankDev(ncclComm_t* newcomm, int nranks, ncclUni
     NCCLCHECKGOTO(bootstrapCreateRoot(&commId, true), res, end);
   }
 
+  // todo: 每个进程init自己的net.
   NCCLCHECKGOTO(ncclInit(), res, end);
   if (myrank == 0) showVersion();
 
@@ -880,6 +883,9 @@ end:
   else return res;
 }
 
+// todo:
+//  input: nRanks, 卡级别的rank, myrank, 卡级别的rank id, commId, communication info.
+//  output: newcomm, nccl句柄.
 NCCL_API(ncclResult_t, ncclCommInitRank, ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank);
 ncclResult_t ncclCommInitRank(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank) {
   int cudaDev;

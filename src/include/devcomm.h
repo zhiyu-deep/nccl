@@ -184,7 +184,7 @@ struct ncclChannel {
       struct ncclTree collTreeUp;
       struct ncclTree collTreeDn;
 
-      int id;
+      int id;  // todo: default to -1, // Mark channels as non initialized.
 
       // Communication structures
       struct ncclPeer* peers;
@@ -203,12 +203,13 @@ struct ncclChannel {
 static_assert(sizeof(struct ncclChannel) == 0x80*sizeof(int), "ncclChannel must have a pow2 size");
 
 struct ncclDevComm {
+  // todo: 卡的rank信息.
   int rank;
   int nRanks;
   int buffSizes[NCCL_NUM_PROTOCOLS];
 
   // Flag to ask NCCL kernels to abort
-  volatile uint32_t *abortFlag;
+  volatile uint32_t *abortFlag;  // todo: 拷贝自ncclComm中的abortFlag.
 
   // Channels, device side
   struct ncclChannel* channels;
