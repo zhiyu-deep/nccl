@@ -60,8 +60,9 @@ struct ncclComm {
   struct ncclPeerInfo* peerInfo;
   struct ncclTopoSystem* topo;
 
-  void* bootstrap;
+  void* bootstrap;  // todo: extState.
 
+  // todo: 基础信息.
   int rank;    // my rank in the communicator
   int nRanks;  // number of GPUs in communicator
   int cudaDev; // my cuda device index
@@ -98,6 +99,7 @@ struct ncclComm {
   float bandwidths[NCCL_NUM_FUNCTIONS][NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
   int maxThreads[NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
 
+  // todo: 是否group stream.
   // An internal CUDA stream for NCCL kernel CGMD launches
   int groupCudaStream;
   cudaStream_t groupStream;

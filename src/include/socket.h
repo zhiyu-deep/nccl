@@ -25,9 +25,10 @@
 // todo: 封装了底层的sockaddr类.
 /* Common socket address storage structure for IPv4/IPv6 */
 union socketAddress {
-  struct sockaddr sa;         // todo: sockaddr可以理解为sockaddr_in和sockaddr_in6的基类.
-  struct sockaddr_in sin;
-  struct sockaddr_in6 sin6;
+  struct sockaddr sa;
+  struct sockaddr_in sin;     // todo: sockaddr其实就是sockaddr_in, 区别: sockaddr中地址+port融合一起, sockaddr_in中地址+port分开.
+                              //    1. __SOCKADDR_COMMON: 代表不同的socker类型, 有AF_INET6, AF_INET等.
+  struct sockaddr_in6 sin6;   // todo: sockaddr和sockaddr_in6结构不同.
 };
 
 /* Format a string representation of a (struct sockaddr *) socket address using getnameinfo()
@@ -37,6 +38,7 @@ union socketAddress {
 static inline const char *socketToString(struct sockaddr *saddr, char *buf) {
   if (buf == NULL || saddr == NULL) return NULL;
   if (saddr->sa_family != AF_INET && saddr->sa_family != AF_INET6) { buf[0]='\0'; return buf; }
+  // todo: host和service(port).
   char host[NI_MAXHOST], service[NI_MAXSERV];
   (void) getnameinfo(saddr, sizeof(union socketAddress), host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV);
   sprintf(buf, "%s<%s>", host, service);
@@ -64,24 +66,25 @@ static inline int envSocketFamily(void) {
   return family;
 }
 
+// todo: ifaddr代表具体的ip地址信息, ifaddr封装了sockaddr(addr和网络掩码), 以及name, broadcast addr等信息(https://zhuanlan.zhihu.com/p/661745228).
+
 // todo: 返回所有有效address, 注意: 匹配的时候, port不会匹配, 只匹配interface name.
-//  input: prefixList, interface规则; sock_family, 指定family; maxIfNameSize, 指定interface最大长度; maxIfs, 指定最多interfaces.
-//	output: names, 保存interface names; addrs, 保存interface address对象.
+//    input: prefixList, interface规则; sock_family, 指定family; maxIfNameSize, 指定interface最大长度; maxIfs, 指定最多interfaces.
+//	  output: names, 保存interface names; addrs, 保存interface address对象.
 static int findInterfaces(const char* prefixList, char* names, union socketAddress *addrs, int sock_family, int maxIfNameSize, int maxIfs) {
 #ifdef ENABLE_TRACE
   char line[1024];
 #endif
-  struct netIf userIfs[MAX_IFS];
-  bool searchNot = prefixList && prefixList[0] == '^';  // todo: ^符号, 表示取反.
+  struct netIf userIfs[MAX_IFS];                          // todo: 收集从prefixList中解析得到的addr信息.
+  bool searchNot = prefixList && prefixList[0] == '^';    // todo: ^符号, 表示取反.
   if (searchNot) prefixList++;
   bool searchExact = prefixList && prefixList[0] == '=';  // todo: =符号, 表示完整匹配.
   if (searchExact) prefixList++;
-	// todo: 将prefixList中内容解析到netIf.
   int nUserIfs = parseStringList(prefixList, userIfs, MAX_IFS);
 
   int found = 0;
   struct ifaddrs *interfaces, *interface;
-  getifaddrs(&interfaces);  // todo: 底层获取所有的interface(prefix + port).
+  getifaddrs(&interfaces);                                // todo: 获取所有网络接口.
   for (interface = interfaces; interface && found < maxIfs; interface = interface->ifa_next) {
     if (interface->ifa_addr == NULL) continue;
 
@@ -172,6 +175,8 @@ static bool matchSubnet(struct ifaddrs local_if, union socketAddress* remote) {
   }
 }
 
+// todo: 返回和remoteAddr同网络的ip.
+//    ifNames: name列表, 表示ip的name; localAddrs: addr列表, 具体ip; ifNameMaxSize: ip name最大长度, 拷贝时使用; maxIfs: 返回的最多ip数.
 static int findInterfaceMatchSubnet(char* ifNames, union socketAddress* localAddrs, union socketAddress* remoteAddr, int ifNameMaxSize, int maxIfs) {
 #ifdef ENABLE_TRACE
   char line[1024];
@@ -328,13 +333,14 @@ static int findInterfaces(char* ifNames, union socketAddress *ifAddrs, int ifNam
   return nIfs;
 }
 
+// todo: 创建服务端listen socket, 返回fd, fd是连接到remoteAddr的句柄.
 static ncclResult_t createListenSocket(int *fd, union socketAddress *localAddr) {
   /* IPv4/IPv6 support */
   int family = localAddr->sa.sa_family;
   int salen = (family == AF_INET) ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
 
   /* Create socket and bind it to a port */
-  int sockfd = socket(family, SOCK_STREAM, 0);
+  int sockfd = socket(family, SOCK_STREAM, 0);  // todo: step1, 创建句柄.
   if (sockfd == -1) {
     WARN("Net : Socket creation failed : %s", strerror(errno));
     return ncclSystemError;
@@ -343,6 +349,7 @@ static ncclResult_t createListenSocket(int *fd, union socketAddress *localAddr) 
   if (socketToPort(&localAddr->sa)) {
     // Port is forced by env. Make sure we get the port.
     int opt = 1;
+    // todo: setsockopt是为了设置socket option, opt返回option个数.
 #if defined(SO_REUSEPORT)
     SYSCHECK(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt)), "setsockopt");
 #else
@@ -350,6 +357,7 @@ static ncclResult_t createListenSocket(int *fd, union socketAddress *localAddr) 
 #endif
   }
 
+  // todo: 将addr绑定到socketFd.(端口是0, 则允许绑定到任意端口).
   // localAddr port should be 0 (Any port)
   SYSCHECK(bind(sockfd, &localAddr->sa, salen), "bind");
 
@@ -370,6 +378,7 @@ static ncclResult_t createListenSocket(int *fd, union socketAddress *localAddr) 
   return ncclSuccess;
 }
 
+// todo: 客户新建到remoteAddr的连接, 返回fd句柄.
 static ncclResult_t connectAddress(int* fd, union socketAddress* remoteAddr) {
   /* IPv4/IPv6 support */
   int family = remoteAddr->sa.sa_family;

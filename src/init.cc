@@ -200,6 +200,7 @@ static ncclResult_t commFree(ncclComm_t comm) {
   return ncclSuccess;
 }
 
+// todo: 初始化communication id中的信息》
 static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   if (ndev < 1) {
     WARN("invalid device count (%d) requested", ndev);
@@ -834,6 +835,9 @@ affinity_restore:
   return ncclSuccess;
 }
 
+// todo:
+//  input: nRanks, 卡级别的ranks; myrank, 卡级别的rank id; commId, communication info(from root); cudaDev, 对应实际卡id.
+//  output: newcomm, nccl句柄.
 ncclResult_t ncclCommInitRankSync(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
   ncclResult_t res;
 
@@ -851,15 +855,20 @@ cleanup:
   return res;
 }
 
+// todo:
+//  input: nRanks, 卡级别的ranks; myrank, 卡级别的rank id; commId, communication info(from root); cudaDev, 对应实际卡id.
+//  output: newcomm, nccl句柄.
 static ncclResult_t ncclCommInitRankDev(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
   ncclResult_t res;
+
+  // todo: root初始化communication id.
   char* env = getenv("NCCL_COMM_ID");
   if (env && myrank == 0) {
     INFO(NCCL_ENV, "NCCL_COMM_ID set by environment to %s", env);
     NCCLCHECKGOTO(bootstrapCreateRoot(&commId, true), res, end);
   }
 
-  // todo: 每个进程init自己的net.
+  // todo: 每个进程初始化自己的bootstrap网络和通信网络.
   NCCLCHECKGOTO(ncclInit(), res, end);
   if (myrank == 0) showVersion();
 
@@ -884,7 +893,7 @@ end:
 }
 
 // todo:
-//  input: nRanks, 卡级别的rank, myrank, 卡级别的rank id, commId, communication info.
+//  input: nRanks, 卡级别的ranks, myrank, 卡级别的rank id, commId, communication info(from root).
 //  output: newcomm, nccl句柄.
 NCCL_API(ncclResult_t, ncclCommInitRank, ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank);
 ncclResult_t ncclCommInitRank(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank) {

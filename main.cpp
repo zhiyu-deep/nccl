@@ -46,7 +46,7 @@ static uint64_t getHostHash(const char* string) {
 	return result;
 }
 
-
+// todo: 获取主机名.
 static void getHostName(char* hostname, int maxlen) {
 	gethostname(hostname, maxlen);
 	for (int i=0; i< maxlen; i++) {

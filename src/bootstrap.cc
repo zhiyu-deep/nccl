@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 
+// todo: 基于socket进行bootstrap.
 struct bootstrapNetComm {
   int fd;
 };
@@ -64,9 +65,14 @@ static ncclResult_t bootstrapNetGetSocketAddr(int dev, union socketAddress* addr
 /* Socket Interface Selection type */
 enum bootstrapInterface_t { findSubnetIf = -1, dontCareIf = -2 };
 
+// todo: 服务端, 创建listen socket句柄.
+//    dev, 表示ip列表index, 获取编号dev的ip;
+//    netHandle, 传进来的时候表示root ip, 返回的时候当作自己监听的ip;
+//    listenComm, 返回在监听地址上的监听句柄.
 static ncclResult_t bootstrapNetListen(int dev, ncclNetHandle_t* netHandle, void** listenComm) {
   union socketAddress* connectAddr = (union socketAddress*) netHandle;
   static_assert(sizeof(union socketAddress) < NCCL_NET_HANDLE_MAXSIZE, "union socketAddress size is too large");
+
   // if dev >= 0, listen based on dev
   if (dev >= 0) {
     NCCLCHECK(bootstrapNetGetSocketAddr(dev, connectAddr));
@@ -82,6 +88,7 @@ static ncclResult_t bootstrapNetListen(int dev, ncclNetHandle_t* netHandle, void
     // pass the local address back
     memcpy(connectAddr, &localAddr, sizeof(localAddr));
   } // Otherwise, handle stores a local address
+
   struct bootstrapNetComm* comm;
   NCCLCHECK(bootstrapNetNewComm(&comm));
   NCCLCHECK(createListenSocket(&comm->fd, connectAddr));
@@ -89,6 +96,10 @@ static ncclResult_t bootstrapNetListen(int dev, ncclNetHandle_t* netHandle, void
   return ncclSuccess;
 }
 
+// todo: 客户端, 创建到netHandle连接的socket句柄.
+//    dev, 表示ip列表index, 获取编号dev的ip;
+//    netHandle, connect的目标地址;
+//    listenComm, 返回连接到远程目标的句柄.
 static ncclResult_t bootstrapNetConnect(int dev, ncclNetHandle_t* netHandle, void** sendComm) {
   union socketAddress* connectAddr = (union socketAddress*) netHandle;
   struct bootstrapNetComm* comm;
@@ -100,6 +111,7 @@ static ncclResult_t bootstrapNetConnect(int dev, ncclNetHandle_t* netHandle, voi
 
 static ncclResult_t bootstrapNetAccept(void* listenComm, void** recvComm) {
   struct bootstrapNetComm* lComm = (struct bootstrapNetComm*)listenComm;
+
   struct bootstrapNetComm* rComm;
   NCCLCHECK(bootstrapNetNewComm(&rComm));
   struct sockaddr_in sockaddr;
@@ -109,19 +121,9 @@ static ncclResult_t bootstrapNetAccept(void* listenComm, void** recvComm) {
   return ncclSuccess;
 }
 
-static ncclResult_t bootstrapNetClose(void* opaqueComm) {
-  struct bootstrapNetComm* comm = (struct bootstrapNetComm*)opaqueComm;
-  if (comm) {
-    close(comm->fd);
-    free(comm);
-  }
-  return ncclSuccess;
-}
-
-static ncclResult_t bootstrapNetCloseSend(void* sendComm) { NCCLCHECK(bootstrapNetClose(sendComm)); return ncclSuccess; }
-static ncclResult_t bootstrapNetCloseRecv(void* recvComm) { NCCLCHECK(bootstrapNetClose(recvComm)); return ncclSuccess; }
-static ncclResult_t bootstrapNetCloseListen(void* listenComm) { NCCLCHECK(bootstrapNetClose(listenComm)); return ncclSuccess; }
-
+// todo: 通过socket句柄发送数据, 发送端通过句柄发送, 接收端通过句柄接收.
+//    1. sync function.
+//    2. 先发送数据大小信息, 再发送具体数据内容.
 // Additional sync functions
 static ncclResult_t bootstrapNetSend(void* sendComm, void* data, int size) {
   struct bootstrapNetComm* comm = (struct bootstrapNetComm*)sendComm;
@@ -140,6 +142,18 @@ static ncclResult_t bootstrapNetRecv(void* recvComm, void* data, int size) {
   NCCLCHECK(socketReceive(comm->fd, data, std::min(recvSize, size)));
   return ncclSuccess;
 }
+
+static ncclResult_t bootstrapNetClose(void* opaqueComm) {
+  struct bootstrapNetComm* comm = (struct bootstrapNetComm*)opaqueComm;
+  if (comm) {
+    close(comm->fd);
+    free(comm);
+  }
+  return ncclSuccess;
+}
+static ncclResult_t bootstrapNetCloseSend(void* sendComm) { NCCLCHECK(bootstrapNetClose(sendComm)); return ncclSuccess; }
+static ncclResult_t bootstrapNetCloseRecv(void* recvComm) { NCCLCHECK(bootstrapNetClose(recvComm)); return ncclSuccess; }
+static ncclResult_t bootstrapNetCloseListen(void* listenComm) { NCCLCHECK(bootstrapNetClose(listenComm)); return ncclSuccess; }
 
 ncclResult_t bootstrapNetCreateHandle(ncclNetHandle_t* netHandle, const char* str) {
   union socketAddress* connectAddr = (union socketAddress*) netHandle;
@@ -260,37 +274,37 @@ struct unexConn {
   struct unexConn* next;
 };
 
+// todo: 构建成功的bootstrap网络状态.
 struct extState {
-  void* extBstrapListenComm;
-  void* extBstrapRingRecvComm;
-  void* extBstrapRingSendComm;
-  ncclNetHandle_t* peerBstrapHandles;
+  void* extBstrapListenComm;    // todo: 当前节点的监听socket
+  void* extBstrapRingRecvComm;  // todo: 当前节点和prev节点的socket连接
+  void* extBstrapRingSendComm;  // todo: 当前节点连接next的socket连接
+  ncclNetHandle_t* peerBstrapHandles;  // todo: 所有rank的ip port(对应extBstrapListenComm)
   struct unexConn* unexpectedConnections;
   int rank;
   int nranks;
-  int dev;
+  int dev;                      // todo: 表示在第几个ip地址监听.
 };
 
 ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commState) {
   ncclNetHandle_t* netHandle = (ncclNetHandle_t*) id;
   bool idFromEnv = getenv("NCCL_COMM_ID") != NULL;
+
   struct extState* state;
   NCCLCHECK(ncclCalloc(&state, 1));
   state->rank = rank;
   state->nranks = nranks;
   *commState = state;
 
-  TRACE(NCCL_INIT, "rank %d nranks %d", rank, nranks);
-
   struct extInfo info = { 0 };
   info.rank = rank;
   info.nranks = nranks;
-  void *tmpSendComm, *tmpRecvComm;
   // Pass the remote address to listen via info
   if (idFromEnv) {
     memcpy(&info.extHandleListen, netHandle, sizeof(ncclNetHandle_t));
     memcpy(&info.extHandleListenRoot, netHandle, sizeof(ncclNetHandle_t));
   }
+
   // listen will return the local address via info (specify interface type 'findSubnetIf')
   state->dev = idFromEnv ? findSubnetIf : 0;
   void* extBstrapListenCommRoot;
@@ -307,6 +321,7 @@ ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commS
     (void) nanosleep(&tv, NULL);
   }
 
+  void *tmpSendComm, *tmpRecvComm;
   // send info on my listening socket to root
   NCCLCHECK(bootstrapNetConnect(state->dev, netHandle, &tmpSendComm));
   NCCLCHECK(bootstrapNetSend(tmpSendComm, &info, sizeof(info)));
@@ -327,8 +342,6 @@ ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commS
   NCCLCHECK(ncclCalloc(&state->peerBstrapHandles, nranks));
   memcpy(state->peerBstrapHandles+rank, info.extHandleListen, sizeof(ncclNetHandle_t));
   NCCLCHECK(bootstrapAllGather(state, state->peerBstrapHandles, sizeof(ncclNetHandle_t)));
-
-  TRACE(NCCL_INIT, "rank %d nranks %d - DONE", rank, nranks);
 
   return ncclSuccess;
 }
