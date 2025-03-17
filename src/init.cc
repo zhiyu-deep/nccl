@@ -861,14 +861,13 @@ cleanup:
 static ncclResult_t ncclCommInitRankDev(ncclComm_t* newcomm, int nranks, ncclUniqueId commId, int myrank, int cudaDev) {
   ncclResult_t res;
 
-  // todo: root初始化communication id.
   char* env = getenv("NCCL_COMM_ID");
   if (env && myrank == 0) {
+    // todo: env == true情况下, root在此处启动子线程.
     INFO(NCCL_ENV, "NCCL_COMM_ID set by environment to %s", env);
     NCCLCHECKGOTO(bootstrapCreateRoot(&commId, true), res, end);
   }
 
-  // todo: 每个进程初始化自己的bootstrap网络和通信网络.
   NCCLCHECKGOTO(ncclInit(), res, end);
   if (myrank == 0) showVersion();
 

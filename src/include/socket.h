@@ -217,6 +217,7 @@ static int findInterfaceMatchSubnet(char* ifNames, union socketAddress* localAdd
   return found;
 }
 
+// todo: socket标准做法, 根据host+server(ip port pair), 创建socketAddress.
 static ncclResult_t GetSocketAddrFromString(union socketAddress* ua, const char* ip_port_pair) {
   if (!(ip_port_pair && strlen(ip_port_pair) > 1)) {
     WARN("Net : string is null");

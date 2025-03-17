@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-// todo: 基于socket进行bootstrap.
+// todo: socket句柄.
 struct bootstrapNetComm {
   int fd;
 };
@@ -66,8 +66,10 @@ static ncclResult_t bootstrapNetGetSocketAddr(int dev, union socketAddress* addr
 enum bootstrapInterface_t { findSubnetIf = -1, dontCareIf = -2 };
 
 // todo: 服务端, 创建listen socket句柄.
-//    dev, 表示ip列表index, 获取编号dev的ip;
-//    netHandle, 传进来的时候表示root ip, 返回的时候当作自己监听的ip;
+//    对于netHandle(socketAddress):
+//      1. dev: 获取第dev个socket address, 将netHandle更新为该地址.
+//      2. findsubnetif: 获取netHandle的子网络.
+//      3. dontCareIf: 直接使用传进来的netHandle.
 //    listenComm, 返回在监听地址上的监听句柄.
 static ncclResult_t bootstrapNetListen(int dev, ncclNetHandle_t* netHandle, void** listenComm) {
   union socketAddress* connectAddr = (union socketAddress*) netHandle;
@@ -155,6 +157,7 @@ static ncclResult_t bootstrapNetCloseSend(void* sendComm) { NCCLCHECK(bootstrapN
 static ncclResult_t bootstrapNetCloseRecv(void* recvComm) { NCCLCHECK(bootstrapNetClose(recvComm)); return ncclSuccess; }
 static ncclResult_t bootstrapNetCloseListen(void* listenComm) { NCCLCHECK(bootstrapNetClose(listenComm)); return ncclSuccess; }
 
+// todo: 基于str(hostname + server)信息, 创建socketAddress(ncclNetHandle_t).
 ncclResult_t bootstrapNetCreateHandle(ncclNetHandle_t* netHandle, const char* str) {
   union socketAddress* connectAddr = (union socketAddress*) netHandle;
   NCCLCHECK(GetSocketAddrFromString(connectAddr, str));
@@ -239,31 +242,44 @@ out:
   return NULL;
 }
 
+// todo: 先获取socketAddrss(ncclNetHandle_t), 然后在socketAddress的基础上创建socket listen;
+//       本接口由root调用, root会在listen的基础上, 完成对其他进程的组网工作.
+//  idFromEnv:
+//    1. true: 表示从env中获取hostname + server信息来创建socketAddrss(ncclNetHandle_t), 并且默认id中已经是创建好的socketAddrss(ncclNetHandle_t), 直接使用.
+//    2. false: 则默认使用本地0号address.
+//  ncclUniqueId: 更新为最终使用的socketAddress.
 ncclResult_t bootstrapCreateRoot(ncclUniqueId* id, bool idFromEnv) {
   ncclNetHandle_t* netHandle = (ncclNetHandle_t*) id;
   void* listenComm;
   NCCLCHECK(bootstrapNetListen(idFromEnv ? dontCareIf : 0, netHandle, &listenComm));
+
+  // todo: root在listen基础上启动线程, 完成对其他进程的组网工作.
   pthread_t thread;
   pthread_create(&thread, NULL, bootstrapRoot, listenComm);
   return ncclSuccess;
 }
 
+// todo: 本接口由root调用, 创建socketAddress(ncclNetHandle_t).
 ncclResult_t bootstrapGetUniqueId(ncclUniqueId* id) {
   static_assert(sizeof(ncclNetHandle_t) < sizeof(ncclUniqueId), "NetId does not fit inside ncclUniqueId");
   memset(id, 0, sizeof(ncclUniqueId));
   ncclNetHandle_t* netHandle = (ncclNetHandle_t*) id;
 
-	// todo: 先不考虑NCCL_COMM_ID的情况.
   char* env = getenv("NCCL_COMM_ID");
   if (env) {
+    // todo: 基于env传入的hostname + server信息, 创建socketAddress(ncclNetHandle_t).
     INFO(NCCL_ENV, "NCCL_COMM_ID set by environment to %s", env);
     if (bootstrapNetCreateHandle(netHandle, env) != 0) {
       WARN("Invalid NCCL_COMM_ID, please use format: <ipv4>:<port> or [<ipv6>]:<port> or <hostname>:<port>");
       return ncclInvalidArgument;
     }
   } else {
+    // todo: 默认使用本机的0号ip, 创建socketAddress(ncclNetHandle_t);
+    //       额外的, 本接口由root调用, root在socketAddress(ncclNetHandle_t)基础上启动监听线程, 完成对其他进程的组网工作.
     NCCLCHECK(bootstrapCreateRoot(id, false));
   }
+
+  // todo: 补充, env == true情况下, root还未启动子线程, 会在后面流程中再启动.
 
   return ncclSuccess;
 }
