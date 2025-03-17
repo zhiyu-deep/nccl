@@ -38,8 +38,8 @@ union socketAddress {
 static inline const char *socketToString(struct sockaddr *saddr, char *buf) {
   if (buf == NULL || saddr == NULL) return NULL;
   if (saddr->sa_family != AF_INET && saddr->sa_family != AF_INET6) { buf[0]='\0'; return buf; }
-  // todo: host和service(port).
   char host[NI_MAXHOST], service[NI_MAXSERV];
+  // todo: bug, 此处直接使用sizeof(union socketAddress), 有越界风险?
   (void) getnameinfo(saddr, sizeof(union socketAddress), host, NI_MAXHOST, service, NI_MAXSERV, NI_NUMERICHOST|NI_NUMERICSERV);
   sprintf(buf, "%s<%s>", host, service);
   return buf;

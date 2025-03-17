@@ -119,6 +119,7 @@ static ncclResult_t ncclInit() {
   if (initialized) return ncclSuccess;
   pthread_mutex_lock(&initLock);
   if (!initialized) {
+    // todo: 设置环境变量.
     initEnv();
     NCCLCHECK(initNet());
     INFO(NCCL_INIT, "Using network %s", ncclNetName());
