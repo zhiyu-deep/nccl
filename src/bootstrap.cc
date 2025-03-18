@@ -24,7 +24,7 @@ static union socketAddress bootstrapNetIfAddrs[MAX_IFS];    // todo: interface a
 static int bootstrapNetIfs = -1;                            // todo: 最后得到的interface个数.
 pthread_mutex_t bootstrapNetLock = PTHREAD_MUTEX_INITIALIZER;
 
-// todo: 保存本机所有interface信息.
+// todo: 保存本机所有interface信息, 初始化: 1. bootstrapNetIfNames, 2. bootstrapNetIfAddrs, 3. bootstrapNetIfs.
 ncclResult_t bootstrapNetInit() {
   if (bootstrapNetIfs == -1) {
     pthread_mutex_lock(&bootstrapNetLock);

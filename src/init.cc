@@ -48,6 +48,7 @@ NCCL_PARAM(CheckPointers, "CHECK_POINTERS", 0);
 ncclNet_t* ncclNet = NULL;
 ncclCollNet_t* ncclCollNet = NULL;
 
+// todo: 使用nccl so中的net库进行硬件检测, 查看条件是否合格, 一旦合格则使用该net库.
 // Returns ncclInternalError if anything fails, causing that network to be ignored.
 ncclResult_t initNet(ncclNet_t* net) {
   int ndev;
@@ -56,7 +57,7 @@ ncclResult_t initNet(ncclNet_t* net) {
   if (ndev <= 0) return ncclSystemError;
   return ncclSuccess;
 }
-
+// todo: 和net同理, 专用于collNet.
 ncclResult_t initCollNet(ncclCollNet_t* collnet) {
   int ndev;
   if (collnet->init(ncclDebugLog) != ncclSuccess) return ncclInternalError;
@@ -64,7 +65,7 @@ ncclResult_t initCollNet(ncclCollNet_t* collnet) {
   if (ndev <= 0) return ncclSystemError;
   return ncclSuccess;
 }
-
+// todo: 从动态库中加载netSymbol.
 ncclResult_t initNetPlugin(ncclNet_t** net, ncclCollNet_t** collnet) {
   void* netPluginLib = dlopen("libnccl-net.so", RTLD_NOW | RTLD_LOCAL);
   if (netPluginLib == NULL) {
@@ -95,13 +96,14 @@ ncclResult_t initNetPlugin(ncclNet_t** net, ncclCollNet_t** collnet) {
   if (netPluginLib != NULL) dlclose(netPluginLib);
   return ncclSuccess;
 }
-
+// todo: 1. 初始化本机的ip地址信息, 2. 初始化nccl中真实使用的net库.
 ncclResult_t initNet() {
   // Always initialize bootstrap network
   NCCLCHECK(bootstrapNetInit());
 
   NCCLCHECK(initNetPlugin(&ncclNet, &ncclCollNet));
   if (ncclNet != NULL) return ncclSuccess;
+  // todo: 优先检测IB网络, 其次使用socket网络.
   if (initNet(&ncclNetIb) == ncclSuccess) {
     ncclNet = &ncclNetIb;
   } else {
@@ -121,6 +123,7 @@ static ncclResult_t ncclInit() {
   if (!initialized) {
     // todo: 设置环境变量.
     initEnv();
+    // todo: 1. 初始化本机的ip地址信息, 2. 初始化nccl中真实使用的net库., socket? IB?
     NCCLCHECK(initNet());
     INFO(NCCL_INIT, "Using network %s", ncclNetName());
     initialized = true;

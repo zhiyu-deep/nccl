@@ -10,9 +10,18 @@
 #include "nccl.h"
 #include "nccl_net.h"
 
+// todo: nccl so中预提供的net库.
+//  1. net库分为socket和IB, 两个库基于基础的网络接口提供了各自的实现;
+//  2. 用户层面, 在网络接口层面串联具体的业务逻辑.
+extern ncclNet_t ncclNetIb;
+extern ncclNet_t ncclNetSocket;
+
+// todo: nccl中实际使用的net库.
 extern ncclNet_t* ncclNet;
+
 typedef char ncclNetHandle_t[NCCL_NET_HANDLE_MAXSIZE];  // todo: 其实就是解析成socket.h中的socketAddress.
 
+// todo: 外部include本头文件, 真实对外提供的net接口, 接口内部调用的是ncclNet_t中的接口.
 // Translation to external API
 static const char* ncclNetName() { return ncclNet->name; }
 static ncclResult_t ncclNetDevices(int* ndev) { NCCLCHECK(ncclNet->devices(ndev)); return ncclSuccess; }
@@ -67,8 +76,5 @@ static ncclResult_t ncclGpuGdrSupport(int* gdrSupport) {
   }
   return ncclSuccess;
 }
-
-extern ncclNet_t ncclNetIb;
-extern ncclNet_t ncclNetSocket;
 
 #endif
