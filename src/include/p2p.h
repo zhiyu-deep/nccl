@@ -9,30 +9,38 @@
 #ifndef NCCL_P2P_H_
 #define NCCL_P2P_H_
 
+// todo: 连接对象, 和连接对象交互需要用到的信息.
 struct ncclP2Pinfo {
  const void* sendbuff;
   void* recvbuff;
-  ssize_t sendbytes;
-  ssize_t recvbytes;
+  ssize_t sendbytes;  // todo: 默认情况下为-1.
+  ssize_t recvbytes;  // todo: 默认情况下为-1.
 };
 
-// todo: 此处先猜测: 一共有nranks peer节点, 但是当前节点最多建立MAXCHANNELS个节点连接(可以和同个节点建立多次连接).
-//        link0 link1 link2 ... linkn
-//  node0
-//  node1
-//  ...
-//  nodek
+// todo: 当前卡的连接情况(拓扑结构).
 struct ncclP2PConnect {
   int nrecv[MAXCHANNELS];
   int nsend[MAXCHANNELS];
-  int* recv;  // todo: recv = new int[MAXCHANNELS * nranks];
-  int* send;  // todo: send = new int[MAXCHANNELS * nranks];
+	// todo: 每个节点最多建立MAXCHANNELS channels, 此处预分配channel数: MAXCHANNELS * nranks(即假设MAXCHANNELS全都连接某一个peer).
+  int* recv;
+  int* send;
 };
 
 struct ncclP2Plist {
-  struct ncclP2Pinfo *peerlist;  // todo: 用来表示和其他卡的连接, peerlist = new ncclP2Pinfo[nranks];
+  struct ncclP2Pinfo *peerlist;   // todo: [nranks], 当前卡连接对象;
   int count;
-  struct ncclP2PConnect connect;
+  struct ncclP2PConnect connect;  // todo: 当前卡的连接情况(拓扑结构).
 };
+
+// todo:       link0(ncclP2Pinfo) link1(ncclP2Pinfo) link2(ncclP2Pinfo) ... linkN(ncclP2Pinfo)
+//       node0
+//       node1
+//       ...
+//       nodeK
+// todo: 当前node
+//													CHANNEL0 CHANNEL1 CHANNEL2 ... (MAXCHANNELS)
+//			 link0(ncclP2Pinfo)
+//			 link1(ncclP2Pinfo)
+//			 ...
 
 #endif

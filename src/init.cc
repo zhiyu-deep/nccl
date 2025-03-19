@@ -204,7 +204,7 @@ static ncclResult_t commFree(ncclComm_t comm) {
   return ncclSuccess;
 }
 
-// todo: 初始化communication id中的信息》
+// todo: 初始化communication id中的信息.
 static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   if (ndev < 1) {
     WARN("invalid device count (%d) requested", ndev);
@@ -246,6 +246,7 @@ static ncclResult_t commAlloc(ncclComm_t* comret, int ndev, int rank) {
   *comm->abortFlag = 0;
 
   comm->argsptr = &comm->args;
+
   comm->collNetSupport = 0;
   comm->p2plist.count=0;
   NCCLCHECK(ncclCalloc(&comm->p2plist.peerlist, comm->nRanks));

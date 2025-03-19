@@ -62,7 +62,7 @@ struct ncclComm {
 
   void* bootstrap;  // todo: extState.
 
-  // todo: 基础信息.
+	// todo: 卡相关的基本信息.
   int rank;    // my rank in the communicator
   int nRanks;  // number of GPUs in communicator
   int cudaDev; // my cuda device index
@@ -99,7 +99,7 @@ struct ncclComm {
   float bandwidths[NCCL_NUM_FUNCTIONS][NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
   int maxThreads[NCCL_NUM_ALGORITHMS][NCCL_NUM_PROTOCOLS];
 
-  // todo: 是否group stream.
+  // todo: group cuda stream?
   // An internal CUDA stream for NCCL kernel CGMD launches
   int groupCudaStream;
   cudaStream_t groupStream;
@@ -107,12 +107,13 @@ struct ncclComm {
   // Whether there has been a fatal error in this communicator.
   ncclResult_t fatalError;
 
+	// todo: 1. 使用ncclCudaHostCalloc已经分配好, 2. cpu和gpu共享abortFlag, 3. 默认值: 0.
   // Flag to ask NCCL kernels to abort
   volatile uint32_t *abortFlag;
 
   // Device side of the communicator
   struct ncclDevComm *devComm;
-  // Host copy of the devComm (to free CUDA allocs)
+  // Host copy of the devComm (to free CUDA allocs)  todo: dev comm的cpu版本, 节省gpu拷贝.
   struct ncclDevComm hostDevComm;
 
   // Intra-process sync
@@ -127,13 +128,16 @@ struct ncclComm {
   int* intraCudaDevs;
   int* intraCGMode; // Whether we can use CUDA9 CGMD or not
   int* intraCC; // Only to check all have the same ComputeCap and disable CGMode if not
+
+	// todo: argsptr = &args.
   struct ncclColl args;
-  void* argsptr; // todo: argsptr = &args.
+  void* argsptr;
 
   // Global proxy thread
   pthread_t proxyThread;
   struct ncclProxyState proxyState;
 
+	// todo: 当前节点最多建立的channel对象.
   struct ncclChannel channels[MAXCHANNELS];
 
   // Whether this communicator uses collNet

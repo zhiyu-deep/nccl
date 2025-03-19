@@ -99,7 +99,6 @@ static ncclResult_t bootstrapNetListen(int dev, ncclNetHandle_t* netHandle, void
 }
 
 // todo: 客户端, 创建到netHandle连接的socket句柄.
-//    dev, 表示ip列表index, 获取编号dev的ip;
 //    netHandle, connect的目标地址;
 //    listenComm, 返回连接到远程目标的句柄.
 static ncclResult_t bootstrapNetConnect(int dev, ncclNetHandle_t* netHandle, void** sendComm) {
@@ -111,6 +110,7 @@ static ncclResult_t bootstrapNetConnect(int dev, ncclNetHandle_t* netHandle, voi
   return ncclSuccess;
 }
 
+// todo: 作为服务器, 接受远端的连接, 并且返回accept句柄.
 static ncclResult_t bootstrapNetAccept(void* listenComm, void** recvComm) {
   struct bootstrapNetComm* lComm = (struct bootstrapNetComm*)listenComm;
 

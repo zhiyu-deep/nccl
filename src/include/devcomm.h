@@ -203,7 +203,6 @@ struct ncclChannel {
 static_assert(sizeof(struct ncclChannel) == 0x80*sizeof(int), "ncclChannel must have a pow2 size");
 
 struct ncclDevComm {
-  // todo: 卡的rank信息.
   int rank;
   int nRanks;
   int buffSizes[NCCL_NUM_PROTOCOLS];
