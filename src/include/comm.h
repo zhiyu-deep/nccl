@@ -60,7 +60,7 @@ struct ncclComm {
   struct ncclPeerInfo* peerInfo;
   struct ncclTopoSystem* topo;
 
-  void* bootstrap;  // todo: extState.
+  void* bootstrap;  // todo: bootstrap.cc中的extState, 建立好bootstrap网络后, 每个节点拥有自己的exeState, 用来表述网络拓扑关系.
 
 	// todo: 卡相关的基本信息.
   int rank;    // my rank in the communicator

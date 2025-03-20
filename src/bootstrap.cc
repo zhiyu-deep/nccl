@@ -190,6 +190,7 @@ static ncclResult_t setFilesLimit() {
   return ncclSuccess;
 }
 
+// todo: root在启动的时候, 会启动bootstrapRoot一直监听, 监听过程中会处理来自子进程的extInfo信息, 完成对所有子进程的组网.
 static void *bootstrapRoot(void* listenComm) {
   struct extInfo info;
   ncclNetHandle_t *rankHandles = NULL;
@@ -203,6 +204,7 @@ static void *bootstrapRoot(void* listenComm) {
   /* Receive addresses from all ranks */
   int nranks = 0, c = 0;
   do {
+		// todo: 从子进程接受extInfo信息.
     NCCLCHECKGOTO(bootstrapNetAccept(listenComm, &tmpComm), res, out);
     NCCLCHECKGOTO(bootstrapNetRecv(tmpComm, &info, sizeof(info)), res, out);
     NCCLCHECKGOTO(bootstrapNetCloseRecv(tmpComm), res, out);
@@ -236,6 +238,7 @@ static void *bootstrapRoot(void* listenComm) {
   for (int r=0; r<nranks; ++r) {
     int next = (r+1) % nranks;
     void *tmpSendComm;
+		// todo: 针对r号子进程, 他的next是r+1号, 把r+1号的地址信息发送给r号, 完成循环网络的建立.
     NCCLCHECKGOTO(bootstrapNetConnect(0, rankHandlesRoot+r, &tmpSendComm), res, out);
     NCCLCHECKGOTO(bootstrapNetSend(tmpSendComm, rankHandles+next, sizeof(ncclNetHandle_t)), res, out);
     NCCLCHECKGOTO(bootstrapNetCloseSend(tmpSendComm), res, out);
@@ -301,16 +304,19 @@ struct unexConn {
 
 // todo: 构建成功的bootstrap网络状态.
 struct extState {
-  void* extBstrapListenComm;    // todo: 当前节点的监听socket
-  void* extBstrapRingRecvComm;  // todo: 当前节点和prev节点的socket连接
-  void* extBstrapRingSendComm;  // todo: 当前节点连接next的socket连接
-  ncclNetHandle_t* peerBstrapHandles;  // todo: 所有rank的ip port(对应extBstrapListenComm)
+  void* extBstrapListenComm;    // todo: nccl执行环境中, 当前节点的监听句柄.
+  void* extBstrapRingRecvComm;  // todo: 当前节点和prev节点的连接句柄.
+  void* extBstrapRingSendComm;  // todo: 当前节点和next节点的连接句柄.
+  ncclNetHandle_t* peerBstrapHandles;  // todo: nranks所有节点的的地址信息.
   struct unexConn* unexpectedConnections;
   int rank;
   int nranks;
   int dev;                      // todo: 表示在第几个ip地址监听.
 };
 
+// todo: bootstrap网络建立.
+//		1. id: root address.
+//		2. commState: 其实就是extState, 建立好bootstrap网络后, 当前节点相关的网络信息维护在extState中.
 ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commState) {
   ncclNetHandle_t* netHandle = (ncclNetHandle_t*) id;
   bool idFromEnv = getenv("NCCL_COMM_ID") != NULL;
@@ -332,6 +338,9 @@ ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commS
 
   // listen will return the local address via info (specify interface type 'findSubnetIf')
   state->dev = idFromEnv ? findSubnetIf : 0;
+	// todo: listen和listen root在同一个网络接口监听.
+	//  1. listen用于nccl整个过程
+	//  2. listen root在本函数的组网阶段使用, 将listen root传递给root, 方便root将信息返回.
   void* extBstrapListenCommRoot;
   NCCLCHECK(bootstrapNetListen(state->dev, &info.extHandleListen, &state->extBstrapListenComm));
   NCCLCHECK(bootstrapNetListen(state->dev, &info.extHandleListenRoot, &extBstrapListenCommRoot));
@@ -359,10 +368,12 @@ ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commS
   NCCLCHECK(bootstrapNetCloseRecv(tmpRecvComm));
   NCCLCHECK(bootstrapNetCloseListen(extBstrapListenCommRoot));
 
+	// todo: 建立和pre节点, next节点的关系.
   NCCLCHECK(bootstrapNetConnect(state->dev, &extHandleNext, &state->extBstrapRingSendComm));
   // Accept the connect request from the previous rank in the AllGather ring
   NCCLCHECK(bootstrapNetAccept(state->extBstrapListenComm, &state->extBstrapRingRecvComm));
 
+	// todo: 通过allGather, 完善每个节点下的peerBstrapHandles数组信息, 里面填充了每个index节点的地址信息.
   // AllGather all listen handlers
   NCCLCHECK(ncclCalloc(&state->peerBstrapHandles, nranks));
   memcpy(state->peerBstrapHandles+rank, info.extHandleListen, sizeof(ncclNetHandle_t));
@@ -371,6 +382,10 @@ ncclResult_t bootstrapInit(ncclUniqueId * id, int rank, int nranks, void** commS
   return ncclSuccess;
 }
 
+// todo: 每个节点拥有一个数组(allData), 并且在数组中填充了自己对应位置的数据, 通过allGather, 填充整个数组的信息.
+//		1. commStage: 维护当前节点的前后节点等信息(exeState).
+//		2. allData: 数组, 并且在自己索引对应的位置填充了具体的内容.
+//		3. size: allData数组中每个元素的字节大小.
 ncclResult_t bootstrapAllGather(void* commState, void* allData, int size) {
   struct extState* state = (struct extState*)commState;
   char* data = (char*)allData;
