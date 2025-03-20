@@ -50,22 +50,31 @@ ncclResult_t bootstrapNetInit() {
   return ncclSuccess;
 }
 
-static ncclResult_t bootstrapNetNewComm(struct bootstrapNetComm** comm) {
-  NCCLCHECK(ncclCalloc(comm, 1));
-  (*comm)->fd = -1;
-  return ncclSuccess;
-}
-
+// todo: 获取本机第dev个interface信息.
 static ncclResult_t bootstrapNetGetSocketAddr(int dev, union socketAddress* addr) {
   if (dev >= bootstrapNetIfs) return ncclInternalError;
   memcpy(addr, bootstrapNetIfAddrs+dev, sizeof(*addr));
   return ncclSuccess;
 }
 
+// todo: 基于str(hostname + server)信息, 创建socketAddress(ncclNetHandle_t).
+ncclResult_t bootstrapNetCreateHandle(ncclNetHandle_t* netHandle, const char* str) {
+  union socketAddress* connectAddr = (union socketAddress*) netHandle;
+  NCCLCHECK(GetSocketAddrFromString(connectAddr, str));
+  return ncclSuccess;
+}
+
+static ncclResult_t bootstrapNetNewComm(struct bootstrapNetComm** comm) {
+  NCCLCHECK(ncclCalloc(comm, 1));
+  (*comm)->fd = -1;
+  return ncclSuccess;
+}
+
+// todo: 枚举类, 选择本机interface的时候使用.
 /* Socket Interface Selection type */
 enum bootstrapInterface_t { findSubnetIf = -1, dontCareIf = -2 };
 
-// todo: 服务端, 创建listen socket句柄.
+// todo: 建立bootstrap网络的时候使用, 监听某个地址:
 //    对于netHandle(socketAddress):
 //      1. dev: 获取第dev个socket address, 将netHandle更新为该地址.
 //      2. findsubnetif: 获取netHandle的子网络.
@@ -97,8 +106,7 @@ static ncclResult_t bootstrapNetListen(int dev, ncclNetHandle_t* netHandle, void
   *listenComm = comm;
   return ncclSuccess;
 }
-
-// todo: 客户端, 创建到netHandle连接的socket句柄.
+// todo: 建立bootstrap网络的时候使用, 连接到某个地址:
 //    netHandle, connect的目标地址;
 //    listenComm, 返回连接到远程目标的句柄.
 static ncclResult_t bootstrapNetConnect(int dev, ncclNetHandle_t* netHandle, void** sendComm) {
@@ -109,8 +117,9 @@ static ncclResult_t bootstrapNetConnect(int dev, ncclNetHandle_t* netHandle, voi
   *sendComm = comm;
   return ncclSuccess;
 }
-
-// todo: 作为服务器, 接受远端的连接, 并且返回accept句柄.
+// todo: 建立bootstrap网络的时候使用, 接收到来自某个地址的请求:
+//    listenComm: 本机监听的句柄.
+//    recvComm: 返回接收到的句柄.
 static ncclResult_t bootstrapNetAccept(void* listenComm, void** recvComm) {
   struct bootstrapNetComm* lComm = (struct bootstrapNetComm*)listenComm;
 
@@ -122,10 +131,11 @@ static ncclResult_t bootstrapNetAccept(void* listenComm, void** recvComm) {
   *recvComm = rComm;
   return ncclSuccess;
 }
-
-// todo: 通过socket句柄发送数据, 发送端通过句柄发送, 接收端通过句柄接收.
-//    1. sync function.
-//    2. 先发送数据大小信息, 再发送具体数据内容.
+// todo:
+//    A(listenComm)                              B(listenComm)
+//    A            -------(connectComm)--------<    send B
+//    A    recv    <------(acceptComm)----------         B
+// todo: 建立bootstrap网络的时候使用, 连接到某个地址, 往该地址发送数据.
 // Additional sync functions
 static ncclResult_t bootstrapNetSend(void* sendComm, void* data, int size) {
   struct bootstrapNetComm* comm = (struct bootstrapNetComm*)sendComm;
@@ -133,6 +143,7 @@ static ncclResult_t bootstrapNetSend(void* sendComm, void* data, int size) {
   NCCLCHECK(socketSend(comm->fd, data, size));
   return ncclSuccess;
 }
+// todo: 建立bootstrap网络的时候使用, 接收某个地址, 从该地址接收数据.
 static ncclResult_t bootstrapNetRecv(void* recvComm, void* data, int size) {
   struct bootstrapNetComm* comm = (struct bootstrapNetComm*)recvComm;
   int recvSize;
@@ -144,7 +155,7 @@ static ncclResult_t bootstrapNetRecv(void* recvComm, void* data, int size) {
   NCCLCHECK(socketReceive(comm->fd, data, std::min(recvSize, size)));
   return ncclSuccess;
 }
-
+// todo: bootstrap网络关闭.
 static ncclResult_t bootstrapNetClose(void* opaqueComm) {
   struct bootstrapNetComm* comm = (struct bootstrapNetComm*)opaqueComm;
   if (comm) {
@@ -157,13 +168,11 @@ static ncclResult_t bootstrapNetCloseSend(void* sendComm) { NCCLCHECK(bootstrapN
 static ncclResult_t bootstrapNetCloseRecv(void* recvComm) { NCCLCHECK(bootstrapNetClose(recvComm)); return ncclSuccess; }
 static ncclResult_t bootstrapNetCloseListen(void* listenComm) { NCCLCHECK(bootstrapNetClose(listenComm)); return ncclSuccess; }
 
-// todo: 基于str(hostname + server)信息, 创建socketAddress(ncclNetHandle_t).
-ncclResult_t bootstrapNetCreateHandle(ncclNetHandle_t* netHandle, const char* str) {
-  union socketAddress* connectAddr = (union socketAddress*) netHandle;
-  NCCLCHECK(GetSocketAddrFromString(connectAddr, str));
-  return ncclSuccess;
-}
-
+// todo: 建立bootstrap网络的时候, extInfo在root和child间传递.
+//    1. rank: 表示child的rank.
+//    2. nranks: 表示总的rank数.
+//    3. extHandleListenRoot: 每个child给root发送extInfo, 会把自己的地址当作root发送给真正的root, 以便root后续返回信息.
+//    4. extHandleListen: 表示在bootstrap网络中, 每个节点真正监听的地址, nccl后续计算过程中使用.
 struct extInfo {
   int rank;
   int nranks;
