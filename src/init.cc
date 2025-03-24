@@ -290,6 +290,7 @@ static void showVersion() {
   }
 }
 
+// todo: 基于gpu和IB的初始信息, 填充当前gpu卡的具体信息.
 static ncclResult_t fillInfo(struct ncclComm* comm, struct ncclPeerInfo* info, uint64_t commHash) {
   info->rank = comm->rank;
   CUDACHECK(cudaGetDevice(&info->cudaDev));
@@ -577,6 +578,7 @@ static ncclResult_t initTransportsRank(struct ncclComm* comm, ncclUniqueId* comm
   NCCLCHECK(ncclCalloc(&comm->peerInfo, nranks+1)); // Extra rank to represent CollNet root
   for (int i = 0; i < nranks; i++) {
     memcpy(comm->peerInfo+i, &allGather1Data[i].peerInfo, sizeof(struct ncclPeerInfo));
+		// todo: 同卡条件, 1. 同host, 2. 同busId.
     if ((i != rank) && (comm->peerInfo[i].hostHash == myInfo->hostHash) && (comm->peerInfo[i].busId == myInfo->busId)) {
       WARN("Duplicate GPU detected : rank %d and rank %d both on CUDA device %x", rank, i, myInfo->busId);
       return ncclInvalidUsage;

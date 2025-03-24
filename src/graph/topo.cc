@@ -510,12 +510,14 @@ ncclResult_t ncclTopoGetSystem(struct ncclComm* comm, struct ncclTopoSystem** sy
   if (xml->maxIndex == 0) {
     // Create top tag
     struct ncclXmlNode* top;
+		// todo: 1. 建立system根节点, 2. 设置根节点的version属性.
     NCCLCHECK(xmlAddNode(xml, NULL, "system", &top));
     NCCLCHECK(xmlSetAttrInt(top, "version", NCCL_TOPO_XML_VERSION));
   }
 
   // Auto-detect GPUs if needed
   for (int r=0; r<comm->nRanks; r++) {
+		// todo: 同hostHash, 即针对本台机器的node(卡), 执行下面操作:
     if (comm->peerInfo[r].hostHash == comm->peerInfo[comm->rank].hostHash) {
       char busId[NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE];
       NCCLCHECK(int64ToBusId(comm->peerInfo[r].busId, busId));

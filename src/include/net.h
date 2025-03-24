@@ -49,8 +49,11 @@ static ncclResult_t ncclGpuGdrSupport(int* gdrSupport) {
     // Find a net device which is GDR-capable
     ncclNetProperties_t props;
     NCCLCHECK(ncclNet->getProperties(dev, &props));
+
+		// todo: 1. IB支持cuda ptr, 表示可以注册显存, 即gdr support.
     if ((props.ptrSupport & NCCL_PTR_CUDA) == 0) continue;
 
+		// todo: 2. 创建rdma连接, 验证是否gdr support.
     // Allocate memory on the GPU and try to register it on the NIC.
     void *lComm = NULL, *sComm = NULL, *rComm = NULL;
     ncclNetHandle_t handle;

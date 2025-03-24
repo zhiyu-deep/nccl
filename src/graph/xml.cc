@@ -323,6 +323,7 @@ ncclResult_t ncclTopoGetXmlFromFile(const char* xmlTopoFile, struct ncclXml* xml
 static void memcpylower(char* dst, const char* src, const size_t size) {
   for (int i=0; i<size; i++) dst[i] = tolower(src[i]);
 }
+// todo: 基于busId值, 找到具体的pci文件夹路径.
 static ncclResult_t getPciPath(const char* busId, char** path) {
   char busPath[] = "/sys/class/pci_bus/0000:00/../../0000:00:00.0";
   memcpylower(busPath+sizeof("/sys/class/pci_bus/")-1, busId, BUSID_REDUCED_SIZE-1);
@@ -334,7 +335,7 @@ static ncclResult_t getPciPath(const char* busId, char** path) {
   }
   return ncclSuccess;
 }
-
+// todo: 系统文件: path/filename, 从该文件中读取文件内容.
 ncclResult_t ncclTopoGetStrFromSys(const char* path, const char* fileName, char* strValue) {
   char filePath[PATH_MAX];
   sprintf(filePath, "%s/%s", path, fileName);
@@ -355,7 +356,7 @@ ncclResult_t ncclTopoGetStrFromSys(const char* path, const char* fileName, char*
   }
   return ncclSuccess;
 }
-
+// todo: 为pciNode设置attrName的属性值, 该属性值从path/filename的系统文件中读取.
 ncclResult_t ncclTopoSetAttrFromSys(struct ncclXmlNode* pciNode, const char* path, const char* fileName, const char* attrName) {
   char strValue[MAX_STR_LEN];
   NCCLCHECK(ncclTopoGetStrFromSys(path, fileName, strValue));
@@ -436,7 +437,7 @@ ncclResult_t ncclTopoGetXmlFromCpu(struct ncclXmlNode* cpuNode, struct ncclXml* 
 #endif
   return ncclSuccess;
 }
-
+// todo: 找到pci, 并且指定busId值的node; 如果未找到, 则创建该node.
 ncclResult_t ncclTopoGetPciNode(struct ncclXml* xml, const char* busId, struct ncclXmlNode** pciNode) {
   NCCLCHECK(xmlFindTagKv(xml, "pci", pciNode, "busid", busId));
   if (*pciNode == NULL) {
@@ -462,36 +463,49 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
   // Fill info, then parent
   const char* busId;
   NCCLCHECK(xmlGetAttr(pciNode, "busid", &busId));
-  char* path = NULL;
+
+  char* path = NULL;  // todo: bus文件路径.
+
   int index;
+
+	// todo: 围绕class属性.
   NCCLCHECK(xmlGetAttrIndex(pciNode, "class", &index));
   if (index == -1) {
     if (path == NULL) NCCLCHECK(getPciPath(busId, &path));
     NCCLCHECK(ncclTopoSetAttrFromSys(pciNode, path, "class", "class"));
   }
+	// todo: 围绕link_speed属性.
   NCCLCHECK(xmlGetAttrIndex(pciNode, "link_speed", &index));
   if (index == -1) {
     if (path == NULL) NCCLCHECK(getPciPath(busId, &path));
+
     char deviceSpeedStr[MAX_STR_LEN];
     float deviceSpeed;
     NCCLCHECK(ncclTopoGetStrFromSys(path, "max_link_speed", deviceSpeedStr));
     sscanf(deviceSpeedStr, "%f GT/s", &deviceSpeed);
+
     char portSpeedStr[MAX_STR_LEN];
     float portSpeed;
     NCCLCHECK(ncclTopoGetStrFromSys(path, "../max_link_speed", portSpeedStr));
     sscanf(portSpeedStr, "%f GT/s", &portSpeed);
+
     NCCLCHECK(xmlSetAttr(pciNode, "link_speed", portSpeed < deviceSpeed ? portSpeedStr : deviceSpeedStr));
   }
+	// todo: 围绕link_width属性.
   NCCLCHECK(xmlGetAttrIndex(pciNode, "link_width", &index));
   if (index == -1) {
     if (path == NULL) NCCLCHECK(getPciPath(busId, &path));
+
     char strValue[MAX_STR_LEN];
     NCCLCHECK(ncclTopoGetStrFromSys(path, "max_link_width", strValue));
+
     int deviceWidth = strtol(strValue, NULL, 0);
     NCCLCHECK(ncclTopoGetStrFromSys(path, "../max_link_width", strValue));
+
     int portWidth = strtol(strValue, NULL, 0);
     NCCLCHECK(xmlSetAttrInt(pciNode, "link_width", std::min(deviceWidth,portWidth)));
   }
+
   struct ncclXmlNode* parent = pciNode->parent;
   if (parent == NULL) {
     if (path == NULL) NCCLCHECK(getPciPath(busId, &path));
@@ -536,6 +550,7 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
       }
       if (parent) break;
     }
+
     pciNode->parent = parent;
     parent->subs[parent->nSubs++] = pciNode;
   }
@@ -656,6 +671,7 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
 
 ncclResult_t ncclTopoFillGpu(struct ncclXml* xml, const char* busId, struct ncclXmlNode** gpuNode) {
   struct ncclXmlNode* node;
+	// todo: 找到的pci, 指定busId的node; 未找到则会创建该node.
   NCCLCHECK(ncclTopoGetPciNode(xml, busId, &node));
   NCCLCHECK(ncclTopoGetXmlFromSys(node, xml));
   NCCLCHECK(wrapNvmlSymbols());

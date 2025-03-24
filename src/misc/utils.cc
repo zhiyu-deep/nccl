@@ -55,6 +55,7 @@ ncclResult_t getBusId(int cudaDev, int64_t *busId) {
   return ncclSuccess;
 }
 
+// todo: 获取本机hostname.
 ncclResult_t getHostName(char* hostname, int maxlen, const char delim) {
   if (gethostname(hostname, maxlen) != 0) {
     strncpy(hostname, "unknown", maxlen);

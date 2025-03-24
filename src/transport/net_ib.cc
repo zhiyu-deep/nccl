@@ -29,6 +29,7 @@
 static char ncclIbIfName[MAX_IF_NAME_SIZE];
 static union socketAddress ncclIbIfAddr;
 
+// todo: 当前机器IB对应的gpu卡信息.
 static int ncclNIbDevs = -1;
 struct ncclIbDev {
   int device;
@@ -212,22 +213,23 @@ ncclResult_t ncclIbDevices(int* ndev) {
   return ncclSuccess;
 }
 
+static ncclResult_t GetSocketAddr(union socketAddress* addr) {
+  memcpy(addr, &ncclIbIfAddr, sizeof(*addr));
+  return ncclSuccess;
+}
+
+// todo: 判断是否安装了nv_peermem，即nv的驱动，如果安装了的话则设置props->ptrSupport |= NCCL_PTR_CUDA，表示可以注册显存.
 // Detect whether GDR can work on a given NIC with the current CUDA device
 // Returns :
 // ncclSuccess : GDR works
 // ncclSystemError : no module or module loaded but not supported by GPU
 ncclResult_t ncclIbGdrSupport(int ibDev) {
-  static int moduleLoaded = -1;
-  if (moduleLoaded == -1) {
-    moduleLoaded = (access("/sys/kernel/mm/memory_peers/nv_mem/version", F_OK) == -1) ? 0 : 1;
-  }
-  if (moduleLoaded == 0) return ncclSystemError;
-  return ncclSuccess;
-}
-
-static ncclResult_t GetSocketAddr(union socketAddress* addr) {
-  memcpy(addr, &ncclIbIfAddr, sizeof(*addr));
-  return ncclSuccess;
+	static int moduleLoaded = -1;
+	if (moduleLoaded == -1) {
+		moduleLoaded = (access("/sys/kernel/mm/memory_peers/nv_mem/version", F_OK) == -1) ? 0 : 1;
+	}
+	if (moduleLoaded == 0) return ncclSystemError;
+	return ncclSuccess;
 }
 
 ncclResult_t ncclIbGetProperties(int dev, ncclNetProperties_t* props) {

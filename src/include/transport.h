@@ -25,6 +25,7 @@ struct ncclRing;
 struct ncclConnector;
 struct ncclComm;
 
+// todo: 运行过程中, 维护了每张卡的硬件信息.
 struct ncclPeerInfo {
   int rank;
   int cudaDev;
