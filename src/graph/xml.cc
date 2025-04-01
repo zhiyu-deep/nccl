@@ -323,7 +323,7 @@ ncclResult_t ncclTopoGetXmlFromFile(const char* xmlTopoFile, struct ncclXml* xml
 static void memcpylower(char* dst, const char* src, const size_t size) {
   for (int i=0; i<size; i++) dst[i] = tolower(src[i]);
 }
-// todo: 基于busId值, 找到具体的pci文件夹路径.
+// todo: 基于busId值, 找到sys中该pci设备的文件夹路径.
 static ncclResult_t getPciPath(const char* busId, char** path) {
   char busPath[] = "/sys/class/pci_bus/0000:00/../../0000:00:00.0";
   memcpylower(busPath+sizeof("/sys/class/pci_bus/")-1, busId, BUSID_REDUCED_SIZE-1);
@@ -356,7 +356,7 @@ ncclResult_t ncclTopoGetStrFromSys(const char* path, const char* fileName, char*
   }
   return ncclSuccess;
 }
-// todo: 为pciNode设置attrName的属性值, 该属性值从path/filename的系统文件中读取.
+// todo: 从path/filename的系统文件中读取内容, 并且将该内容设置为属性名attrname的属性值.
 ncclResult_t ncclTopoSetAttrFromSys(struct ncclXmlNode* pciNode, const char* path, const char* fileName, const char* attrName) {
   char strValue[MAX_STR_LEN];
   NCCLCHECK(ncclTopoGetStrFromSys(path, fileName, strValue));
@@ -437,7 +437,7 @@ ncclResult_t ncclTopoGetXmlFromCpu(struct ncclXmlNode* cpuNode, struct ncclXml* 
 #endif
   return ncclSuccess;
 }
-// todo: 找到pci, 并且指定busId值的node; 如果未找到, 则创建该node.
+// todo: 找到pci, 并且特别busid属性值的node; 如果未找到, 则创建该node; 并且设置其busid属性值.
 ncclResult_t ncclTopoGetPciNode(struct ncclXml* xml, const char* busId, struct ncclXmlNode** pciNode) {
   NCCLCHECK(xmlFindTagKv(xml, "pci", pciNode, "busid", busId));
   if (*pciNode == NULL) {
@@ -474,6 +474,7 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
     if (path == NULL) NCCLCHECK(getPciPath(busId, &path));
     NCCLCHECK(ncclTopoSetAttrFromSys(pciNode, path, "class", "class"));
   }
+
 	// todo: 围绕link_speed属性.
   NCCLCHECK(xmlGetAttrIndex(pciNode, "link_speed", &index));
   if (index == -1) {
@@ -491,6 +492,7 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
 
     NCCLCHECK(xmlSetAttr(pciNode, "link_speed", portSpeed < deviceSpeed ? portSpeedStr : deviceSpeedStr));
   }
+
 	// todo: 围绕link_width属性.
   NCCLCHECK(xmlGetAttrIndex(pciNode, "link_width", &index));
   if (index == -1) {
@@ -522,8 +524,10 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
       if (path[parentOffset] == '/') {
         slashCount++;
         path[parentOffset] = '\0';
+
         int start = parentOffset - 1;
         while (start>0 && path[start] != '/') start--;
+
         // Check whether the parent path looks like "BBBB:BB:DD.F" or not.
         if (checkBDFFormat(path+start+1) == 0) {
           // This a CPU root complex. Create a CPU tag and stop there.
@@ -554,11 +558,13 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
     pciNode->parent = parent;
     parent->subs[parent->nSubs++] = pciNode;
   }
+
   if (strcmp(parent->name, "pci") == 0) {
     NCCLCHECK(ncclTopoGetXmlFromSys(parent, xml));
   } else if (strcmp(parent->name, "cpu") == 0) {
     NCCLCHECK(ncclTopoGetXmlFromCpu(parent, xml));
   }
+
   free(path);
   return ncclSuccess;
 }
@@ -669,10 +675,12 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
   return ncclSuccess;
 }
 
+// todo: 基于busId, 创建具体的node表示gpu这张卡.
 ncclResult_t ncclTopoFillGpu(struct ncclXml* xml, const char* busId, struct ncclXmlNode** gpuNode) {
+	// todo: 1. 找到gpu后, 先创建1个pci node表示该卡.
   struct ncclXmlNode* node;
-	// todo: 找到的pci, 指定busId的node; 未找到则会创建该node.
   NCCLCHECK(ncclTopoGetPciNode(xml, busId, &node));
+
   NCCLCHECK(ncclTopoGetXmlFromSys(node, xml));
   NCCLCHECK(wrapNvmlSymbols());
   NCCLCHECK(wrapNvmlInit());

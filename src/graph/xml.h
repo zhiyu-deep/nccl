@@ -19,22 +19,28 @@
 #define NODE_TYPE_SINGLE 3
 
 struct ncclXmlNode {
-  char name[MAX_STR_LEN];
+  char name[MAX_STR_LEN];  // todo: 节点名称.
+	// todo: 属性相关.
+	//	 nAttrs: 当前节点属性个数.
+	//	 attrs: 当前节点属性的具体内容, value可能是不同数据类型, int等.
+	//		 1. busId(int): 在当前机器的busId, 该busId并不是总线号, 指的其实是定位一个PCIe设备用到的id，即BDF(bus + device + function)，一个bus上有多个设备，一个设备有多个功能，因此通过BDF就可以定位一个设备.
+	//		 2. class
+	//		 3. link_speed
+	//		 4. link_width
   struct {
     char key[MAX_STR_LEN];
     char value[MAX_STR_LEN];
   } attrs[MAX_ATTR_COUNT+1]; // Need an extra one to consume extra params
-	// todo: 表示节点的属性个数:
-	//		1. busId(int): 在当前机器的busId, 该busId并不是总线号, 指的其实是定位一个PCIe设备用到的id，即BDF(bus + device + function)，一个bus上有多个设备，一个设备有多个功能，因此通过BDF就可以定位一个设备.
   int nAttrs;
+
   int type;
-  struct ncclXmlNode* parent;
-  struct ncclXmlNode* subs[MAX_SUBS];  // todo: 表示节点的所有子节点.
-  int nSubs;  // todo: 表示节点的子节点个数.
+  struct ncclXmlNode* parent;          // todo: 当前节点的父节点.
+  struct ncclXmlNode* subs[MAX_SUBS];  // todo: 当前节点的所有子节点.
+  int nSubs;                           // todo: 表示节点的子节点个数.
 };
 
 // todo: xml树.
-//		1. nodes: 预分配了节点数, node不需要再实例化, 每张卡就是一个node.
+//		1. nodes: 预分配了节点数, node不需要再实例化, pcie路径上每个节点就是一个node.
 //		2. maxIndex: 最后一个节点的index.
 struct ncclXml {
   struct ncclXmlNode nodes[MAX_NODES];
@@ -68,7 +74,7 @@ static ncclResult_t xmlGetAttrIndex(struct ncclXmlNode* node, const char* attrNa
   }
   return ncclSuccess;
 }
-
+// todo: 找到node中, attrname的属性, 并且返回其属性值; 如果不存在该attrname属性, 则属性值为Null.
 static ncclResult_t xmlGetAttr(struct ncclXmlNode* node, const char* attrName, const char** value) {
   int index;
   NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));
@@ -109,7 +115,7 @@ static ncclResult_t xmlFindTag(struct ncclXml* xml, const char* tagName, struct 
   }
   return ncclSuccess;
 }
-// todo: 找到节点名为tagName, 属性名为attrName, 属性值为attrValue的node.
+// todo: 找到节点名为tagName, 属性名为attrName, 属性值为attrValue的node; 否则返回null node.
 static ncclResult_t xmlFindTagKv(struct ncclXml* xml, const char* tagName, struct ncclXmlNode** node, const char* attrName, const char* attrValue) {
   *node = NULL;
   for (int i=0; i<xml->maxIndex; i++) {
@@ -136,7 +142,7 @@ static ncclResult_t xmlSetAttr(struct ncclXmlNode* node, const char* attrName, c
   strncpy(node->attrs[index].value, value, MAX_STR_LEN);
   return ncclSuccess;
 }
-// todo: int类型, 设置attrName属性的具体值.
+// todo: int类型属性, 若不存在该属性名, 则创建该属性, 并且设置具体的属性值.
 static ncclResult_t xmlSetAttrInt(struct ncclXmlNode* node, const char* attrName, const int value) {
   int index;
   NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));
@@ -192,7 +198,7 @@ static ncclResult_t xmlGetSubKvInt(struct ncclXmlNode* node, const char* subName
   return ncclSuccess;
 }
 
-// todo: 往xml中添加node, xml对象中已经预分配node, 所以选取合适的node当作创建的node返回.
+// todo: 往xml中添加node, xml对象中已经预分配node, 所以选取合适的node当作创建的node返回; 1. 为node初始化, 2. 为node设置parent和节点名.
 static ncclResult_t xmlAddNode(struct ncclXml* xml, struct ncclXmlNode* parent, const char* subName, struct ncclXmlNode** sub) {
   if (xml->maxIndex == MAX_NODES) {
     WARN("Error : too many XML nodes (max %d)", MAX_NODES);
