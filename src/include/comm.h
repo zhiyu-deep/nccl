@@ -57,7 +57,7 @@ struct ncclRecvMem {
 };
 
 struct ncclComm {
-  struct ncclPeerInfo* peerInfo;  // todo: [nRanks + 1], allGather的结果, 在每张卡的视角下, 保存了每张peer卡的硬件信息.
+  struct ncclPeerInfo* peerInfo;  // todo: [nRanks + 1], allGather的结果, 在每张卡的视角下, 保存了每张卡的硬件信息.
   struct ncclTopoSystem* topo;
 
   void* bootstrap;  // todo: bootstrap.cc中的extState, 建立好bootstrap网络后, 每个节点拥有自己的exeState, 用来表述网络拓扑关系.

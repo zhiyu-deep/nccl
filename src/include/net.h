@@ -39,6 +39,13 @@ static ncclResult_t ncclNetCloseSend(void* sendComm) { NCCLCHECK(ncclNet->closeS
 static ncclResult_t ncclNetCloseRecv(void* recvComm) { NCCLCHECK(ncclNet->closeRecv(recvComm)); return ncclSuccess; }
 static ncclResult_t ncclNetCloseListen(void* listenComm) { NCCLCHECK(ncclNet->closeListen(listenComm)); return ncclSuccess; }
 
+/**
+ * rdma在通信前需要注册一段内存，使得网卡知道虚拟地址和物理地址的映射.
+ * 但是如果每次通信都需要将data从显存拷贝到内存再通信的话效率就比较低.
+ * IB提供了peer memory的接口，使得ib网卡可以访问其他PCIe空间,
+ * nv基于peer memory实现了自己的驱动，使得rdma可以直接注册显存
+ * 这样通信就可以避免host和device的内存拷贝，IB可以直接dma显存，即gdr。
+ */
 // Test whether the current GPU support GPU Direct RDMA.
 #define GPU_BUF_SIZE (2*1024*1024)
 static ncclResult_t ncclGpuGdrSupport(int* gdrSupport) {
@@ -64,6 +71,7 @@ static ncclResult_t ncclGpuGdrSupport(int* gdrSupport) {
     NCCLCHECK(ncclNetAccept(lComm, &rComm));
     CUDACHECK(cudaMalloc(&gpuPtr, GPU_BUF_SIZE));
     ncclDebugNoWarn = NCCL_NET;
+		// todo: 验证send和read句柄下注册显存正确性.
     if (ncclNetRegMr(sComm, gpuPtr, GPU_BUF_SIZE, NCCL_PTR_CUDA, &mHandle) == ncclSuccess) {
       NCCLCHECK(ncclNetDeregMr(sComm, mHandle));
       NCCLCHECK(ncclNetRegMr(rComm, gpuPtr, GPU_BUF_SIZE, NCCL_PTR_CUDA, &mHandle));

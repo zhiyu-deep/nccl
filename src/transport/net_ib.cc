@@ -232,6 +232,7 @@ ncclResult_t ncclIbGdrSupport(int ibDev) {
 	return ncclSuccess;
 }
 
+// todo: 获取ib网卡的信息, dev表示ib网卡 id信息.
 ncclResult_t ncclIbGetProperties(int dev, ncclNetProperties_t* props) {
   props->name = ncclIbDevs[dev].devName;
   props->pciPath = ncclIbDevs[dev].pciPath;
@@ -240,7 +241,7 @@ ncclResult_t ncclIbGetProperties(int dev, ncclNetProperties_t* props) {
   if (ncclIbGdrSupport(dev) != ncclSuccess) {
     INFO(NCCL_NET,"NET/IB : GPU Direct RDMA Disabled for HCA %d '%s' (no module)", dev, ncclIbDevs[dev].devName);
   } else {
-    props->ptrSupport |= NCCL_PTR_CUDA;
+    props->ptrSupport |= NCCL_PTR_CUDA;  // todo: nv装有网卡驱动, 则支持gdr.
   }
   props->speed = ncclIbDevs[dev].speed;
   props->port = ncclIbDevs[dev].port + ncclIbDevs[dev].realPort;
@@ -471,12 +472,15 @@ NCCL_PARAM(IbGdrFlushDisable, "GDR_FLUSH_DISABLE", 0);
 
 ncclResult_t ncclIbAccept(void* listenComm, void** recvComm) {
   struct ncclIbListenComm* lComm = (struct ncclIbListenComm*)listenComm;
+
   struct ncclIbRecvComm* rComm;
   NCCLCHECK(ncclIbMalloc((void**)&rComm, sizeof(struct ncclIbRecvComm)));
 
-  struct sockaddr_in sockaddr;
-  socklen_t socklen = sizeof(struct sockaddr_in);
+  struct sockaddr_in sockaddr;  //todo: 接受到的用户地址.
+  socklen_t socklen = sizeof(struct sockaddr_in);  // todo: 接收到的用户地址长度.
   SYSCHECKVAL(accept(lComm->fd, (struct sockaddr*)&sockaddr, &socklen), "accept", rComm->fd);
+
+	// todo: 从用户处接受ncclIbQpInfo信息.
   struct ncclIbQpInfo remQpInfo;
   NCCLCHECK(socketReceive(rComm->fd, &remQpInfo, sizeof(remQpInfo)));
 

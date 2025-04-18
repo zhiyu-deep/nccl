@@ -28,12 +28,13 @@ struct ncclComm;
 // todo: 运行过程中, 维护了每张卡的硬件信息.
 struct ncclPeerInfo {
   int rank;
-  int cudaDev;
-  int gdrSupport;
-  uint64_t hostHash;
-  uint64_t pidHash;
-  dev_t shmDev;
-  int64_t busId;
+  int cudaDev;  			// todo: 当前卡物理id.
+  int gdrSupport;     // todo: 是否支持gdr(和ib网卡memory direct access)
+  uint64_t hostHash;  // todo: host哈希.
+  uint64_t pidHash;   // todo: 当前进程号哈希.
+  dev_t shmDev;				// todo: /dev/shm的设备号, can use that information to decide whether we can use SHM for inter-process
+											// 		   communication in a container environment
+  int64_t busId;      // todo: pcie bus id.
 };
 
 #define CONNECT_SIZE 128
