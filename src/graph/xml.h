@@ -62,7 +62,7 @@ ncclResult_t ncclTopoFillNet(struct ncclXml* xml, const char* pciPath, const cha
 /* XML Struct */
 /* Functions  */
 /**************/
-// todo: 根据atteName返回attr index, 1. 找到具体index, 2. -1, 表示未找到.
+// todo: 在node中, 根据atteName返回attr index, 1. 找到具体index, 2. -1, 表示未找到.
 static ncclResult_t xmlGetAttrIndex(struct ncclXmlNode* node, const char* attrName, int* index) {
   *index = -1;
   const int nAttrs = node->nAttrs;
@@ -131,7 +131,7 @@ static ncclResult_t xmlFindTagKv(struct ncclXml* xml, const char* tagName, struc
   }
   return ncclSuccess;
 }
-// todo: str, 设置atteName属性的具体值.
+// todo: 在xml node, 设置atteName属性的具体值.
 static ncclResult_t xmlSetAttr(struct ncclXmlNode* node, const char* attrName, const char* value) {
   int index;
   NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));
@@ -142,7 +142,9 @@ static ncclResult_t xmlSetAttr(struct ncclXmlNode* node, const char* attrName, c
   strncpy(node->attrs[index].value, value, MAX_STR_LEN);
   return ncclSuccess;
 }
-// todo: int类型属性, 若不存在该属性名, 则创建该属性, 并且设置具体的属性值.
+// todo: 设置int类型属性内容
+//  1. 若不存在该属性名, 则创建该属性
+//  2. 设置属性名, 属性内容.
 static ncclResult_t xmlSetAttrInt(struct ncclXmlNode* node, const char* attrName, const int value) {
   int index;
   NCCLCHECK(xmlGetAttrIndex(node, attrName, &index));
@@ -198,7 +200,9 @@ static ncclResult_t xmlGetSubKvInt(struct ncclXmlNode* node, const char* subName
   return ncclSuccess;
 }
 
-// todo: 往xml中添加node, xml对象中已经预分配node, 所以选取合适的node当作创建的node返回; 1. 为node初始化, 2. 为node设置parent和节点名.
+// todo: 往xml中添加node, xml对象中已经预分配node, 所以选取合适的node当作创建的node返回;
+//  1. 为node属性内容进行初始化
+//  2. 为node设置parent和节点名.
 static ncclResult_t xmlAddNode(struct ncclXml* xml, struct ncclXmlNode* parent, const char* subName, struct ncclXmlNode** sub) {
   if (xml->maxIndex == MAX_NODES) {
     WARN("Error : too many XML nodes (max %d)", MAX_NODES);

@@ -30,7 +30,7 @@ struct ncclPeerInfo {
   int rank;
   int cudaDev;  			// todo: 当前卡物理id.
   int gdrSupport;     // todo: 是否支持gdr(和ib网卡memory direct access)
-  uint64_t hostHash;  // todo: host哈希.
+  uint64_t hostHash;  // todo: 当前host哈希.
   uint64_t pidHash;   // todo: 当前进程号哈希.
   dev_t shmDev;				// todo: /dev/shm的设备号, can use that information to decide whether we can use SHM for inter-process
 											// 		   communication in a container environment
