@@ -462,7 +462,7 @@ int checkBDFFormat(char* bdf) {
 
 // todo: 围绕xml中的一个pci node进行遍历(node名为pci).
 //	 1. 设置pci node的属性.
-//	 2. 为该node找到parent node, 然后递归.
+//	 2. 从xml树中, 为该node找到parent node, 然后递归.
 ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* xml) {
   // Fill info, then parent
   const char* busId;
@@ -576,10 +576,12 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
 ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvmlDev, struct ncclXml* xml, struct ncclXmlNode** gpuNodeRet) {
   struct ncclXmlNode* gpuNode = NULL;
   NCCLCHECK(xmlGetSub(pciNode, "gpu", &gpuNode));
+	// todo: 前面为busId的卡建立了xml节点, 现在在该pci节点下面挂gpu节点, 该节点名为gpu.
   if (gpuNode == NULL) NCCLCHECK(xmlAddNode(xml, pciNode, "gpu", &gpuNode));
 
   int index = -1;
 
+	// todo: 围绕dev属性, 查找卡的dev信息(即卡id).
   int dev = -1;
   NCCLCHECK(xmlGetAttrIndex(gpuNode, "dev", &index));
   if (index == -1) {
@@ -596,6 +598,7 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
   NCCLCHECK(xmlGetAttrInt(gpuNode, "dev", &dev));
   if (dev == -1) { *gpuNodeRet = NULL; return ncclSuccess; }
 
+	// todo: 围绕sm属性, 设置卡的sm信息.
   NCCLCHECK(xmlGetAttrIndex(gpuNode, "sm", &index));
   if (index == -1) {
     int cudaMajor, cudaMinor;
@@ -644,6 +647,9 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
         if (p[c] == 0) break;
       }
 
+			// todo: 从gpuNode下寻找节点名nvlink, target属性对应的值为目标busid的xml节点(即表示当前卡通过nvlink连接的目标卡).
+			//	 1. 将该连接方式(nvlink)当作一个xmlnode挂在gpuNode下面, 设置target为目标卡.
+			//	 2. nvlink xmlNode还有1个属性叫做count, 因为当前卡和目标卡可能挂载了多条nvlink, 则这些nvlink都合并到该nvlink xmlNode, 用count表示有几条连接.
       NCCLCHECK(xmlGetSubKv(gpuNode, "nvlink", &nvlNode, "target", lowerId));
       if (nvlNode == NULL) {
         NCCLCHECK(xmlAddNode(xml, gpuNode, "nvlink", &nvlNode));
@@ -656,6 +662,8 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
       }
     }
   }
+
+	// todo: 针对当前gpu卡的所有nvlink, 设置该link的类型(tclass): 1. nvswitch, 2. 具体的link类型(从文件中读取的).
   // Fill target classes
   for (int s=0; s<gpuNode->nSubs; s++) {
     struct ncclXmlNode* sub = gpuNode->subs[s];
@@ -679,17 +687,22 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
   return ncclSuccess;
 }
 
-// todo: 基于给定的gpu busId, 创建具体的xml node表示gpu这张卡.
+// todo: 当前进程, 基于给定的gpu busId, 创建具体的xml node表示gpu这张卡, 进一步填充xml树(每个进程有一棵xml树).
 ncclResult_t ncclTopoFillGpu(struct ncclXml* xml, const char* busId, struct ncclXmlNode** gpuNode) {
 	// todo: 名为pci, busid属性值为busId的xml节点.
   struct ncclXmlNode* node;
   NCCLCHECK(ncclTopoGetPciNode(xml, busId, &node));
 
+	// todo: 一张卡对应一个pci node和一个gpu node.
+	// todo: 填充pci node的信息.
   NCCLCHECK(ncclTopoGetXmlFromSys(node, xml));
+
   NCCLCHECK(wrapNvmlSymbols());
   NCCLCHECK(wrapNvmlInit());
   nvmlDevice_t nvmlDev;
   if (wrapNvmlDeviceGetHandleByPciBusId(busId, &nvmlDev) != ncclSuccess) nvmlDev = NULL;
+
+	// todo: 创建gpu node, 填充gpu node的信息.
   NCCLCHECK(ncclTopoGetXmlFromGpu(node, nvmlDev, xml, gpuNode));
   return ncclSuccess;
 }

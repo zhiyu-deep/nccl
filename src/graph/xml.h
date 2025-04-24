@@ -167,6 +167,7 @@ static ncclResult_t xmlSetAttrFloat(struct ncclXmlNode* node, const char* attrNa
   return ncclSuccess;
 }
 
+// todo: 从node节点下, 寻找名为subName的子节点, 未找到则为nullptr.
 static ncclResult_t xmlGetSub(struct ncclXmlNode* node, const char* subName, struct ncclXmlNode** sub) {
   *sub = NULL;
   for (int s=0; s<node->nSubs; s++) {
@@ -178,6 +179,7 @@ static ncclResult_t xmlGetSub(struct ncclXmlNode* node, const char* subName, str
   return ncclSuccess;
 }
 
+// todo: 针对node, 寻找子节点, 满足条件:1. 子节点名为subName, 2. 子节点attrName属性的值为attrValue, 否则返回nullptr.
 static ncclResult_t xmlGetSubKv(struct ncclXmlNode* node, const char* subName, struct ncclXmlNode** sub, const char* attrName, const char* attrValue) {
   *sub = NULL;
   for (int s=0; s<node->nSubs; s++) {
