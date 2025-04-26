@@ -460,15 +460,16 @@ int checkBDFFormat(char* bdf) {
   return 1;
 }
 
-// todo: 围绕xml中的一个pci node进行遍历(node名为pci).
-//	 1. 设置pci node的属性.
-//	 2. 从xml树中, 为该node找到parent node, 然后递归.
+// todo: 将一个pci node添加到xml树上, 建树是一个寻找parent, 然后递归的过程, 最后所有pci node都挂在system node这个root node下面.
+//   1. pci node的busid属性值是其busId信息.
+//	 2. 设置pci node的属性.
+//	 3. 从xml树中, 为该node找到parent node, 然后基于parent node进行递归.
 ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* xml) {
   // Fill info, then parent
   const char* busId;
   NCCLCHECK(xmlGetAttr(pciNode, "busid", &busId));
 
-  char* path = NULL;  // todo: bus文件路径.
+  char* path = NULL;  // todo: busid对应的system path文件夹.
 
   int index;
 
@@ -520,6 +521,7 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
     char numaIdStr[MAX_STR_LEN];
     NCCLCHECK(ncclTopoGetStrFromSys(path, "numa_node", numaIdStr));
 
+		// todo: pci设备的parent, 可能是pci switch? 可能是cpu root?
     // Go up one level in the PCI tree. Rewind two "/" and follow the upper PCI
     // switch, or stop if we reach a CPU root complex.
     int slashCount = 0;
@@ -537,6 +539,8 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
           // This a CPU root complex. Create a CPU tag and stop there.
           struct ncclXmlNode* topNode;
           NCCLCHECK(xmlFindTag(xml, "system", &topNode));
+					// todo: cpu node是挂载在system node下面.
+					//  当前pci设备对应的cpu root, 要求和当前pci设备在同一个numa下面.
           NCCLCHECK(xmlGetSubKv(topNode, "cpu", &parent, "numaid", numaIdStr));
           if (parent == NULL) {
             NCCLCHECK(xmlAddNode(xml, topNode, "cpu", &parent));
@@ -573,10 +577,11 @@ ncclResult_t ncclTopoGetXmlFromSys(struct ncclXmlNode* pciNode, struct ncclXml* 
   return ncclSuccess;
 }
 
+// todo: 为gpu卡对应的pci node, 下面挂在gpu node->nvlink node等.
 ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvmlDev, struct ncclXml* xml, struct ncclXmlNode** gpuNodeRet) {
+	// todo: pci node下面挂载gpu node.
   struct ncclXmlNode* gpuNode = NULL;
   NCCLCHECK(xmlGetSub(pciNode, "gpu", &gpuNode));
-	// todo: 前面为busId的卡建立了xml节点, 现在在该pci节点下面挂gpu节点, 该节点名为gpu.
   if (gpuNode == NULL) NCCLCHECK(xmlAddNode(xml, pciNode, "gpu", &gpuNode));
 
   int index = -1;
@@ -625,6 +630,7 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
       maxNvLinks = 0;
     }
 
+		// todo: nv设备卡规定了最大nvlink port数目; 在当前gpu卡下遍历检测所有nvlink port, 如果有效, 则建立nvlink node.
     for (int l=0; l<maxNvLinks; ++l) {
       // Check whether we can use this NVLink for P2P
       unsigned canP2P;
@@ -635,7 +641,7 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
       if ((wrapNvmlDeviceGetNvLinkState(nvmlDev, l, &isActive) != ncclSuccess) || (isActive != NVML_FEATURE_ENABLED)) continue;
 
       // Try to figure out what's on the other side of the NVLink
-      nvmlPciInfo_t remoteProc;
+      nvmlPciInfo_t remoteProc;  // todo: 获取nvlink的对端信息(是另一个pcie设备).
       if (wrapNvmlDeviceGetNvLinkRemotePciInfo(nvmlDev, l, &remoteProc) != ncclSuccess) continue;
 
       // Make a lower case copy of the bus ID for calling ncclDeviceType
@@ -647,9 +653,10 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
         if (p[c] == 0) break;
       }
 
-			// todo: 从gpuNode下寻找节点名nvlink, target属性对应的值为目标busid的xml节点(即表示当前卡通过nvlink连接的目标卡).
-			//	 1. 将该连接方式(nvlink)当作一个xmlnode挂在gpuNode下面, 设置target为目标卡.
-			//	 2. nvlink xmlNode还有1个属性叫做count, 因为当前卡和目标卡可能挂载了多条nvlink, 则这些nvlink都合并到该nvlink xmlNode, 用count表示有几条连接.
+			// todo: 从gpuNode下寻找nvlink node:
+			//   1. gouNode下面可能有多个nvlink node, nvlink node的target属性对应目标设备的busid信息, 需要根据target信息确定每一个唯一的nvlink node.
+			//	 2. gpu node下面挂载nvlink node.
+			//	 3. nvlinkNode还有1个属性叫做count, 因为当前卡和目标卡可能挂载了多条nvlink, 则这些nvlink都合并到唯一的nvlink node, 用count表示有几条连接.
       NCCLCHECK(xmlGetSubKv(gpuNode, "nvlink", &nvlNode, "target", lowerId));
       if (nvlNode == NULL) {
         NCCLCHECK(xmlAddNode(xml, gpuNode, "nvlink", &nvlNode));
@@ -663,7 +670,7 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
     }
   }
 
-	// todo: 针对当前gpu卡的所有nvlink, 设置该link的类型(tclass): 1. nvswitch, 2. 具体的link类型(从文件中读取的).
+	// todo: 针对当前gpu卡的所有nvlink node, 还有一个属性叫tclass, 用来表示nvlink连接的设备类型: 1. nvswitch, 2. 连接的是一个gpu设备.
   // Fill target classes
   for (int s=0; s<gpuNode->nSubs; s++) {
     struct ncclXmlNode* sub = gpuNode->subs[s];
@@ -687,14 +694,13 @@ ncclResult_t ncclTopoGetXmlFromGpu(struct ncclXmlNode* pciNode, nvmlDevice_t nvm
   return ncclSuccess;
 }
 
-// todo: 当前进程, 基于给定的gpu busId, 创建具体的xml node表示gpu这张卡, 进一步填充xml树(每个进程有一棵xml树).
+// todo: 当前进程(每个进程有一颗关于本机的xml树); 基于给定的gpu busId, 创建pci node->gpu node->nvlink node等详细信息.
 ncclResult_t ncclTopoFillGpu(struct ncclXml* xml, const char* busId, struct ncclXmlNode** gpuNode) {
-	// todo: 名为pci, busid属性值为busId的xml节点.
+	// todo: busid属性值为busId的pci node.
   struct ncclXmlNode* node;
   NCCLCHECK(ncclTopoGetPciNode(xml, busId, &node));
 
-	// todo: 一张卡对应一个pci node和一个gpu node.
-	// todo: 填充pci node的信息.
+	// todo: 将该pci node添加到树上.
   NCCLCHECK(ncclTopoGetXmlFromSys(node, xml));
 
   NCCLCHECK(wrapNvmlSymbols());
@@ -702,7 +708,7 @@ ncclResult_t ncclTopoFillGpu(struct ncclXml* xml, const char* busId, struct nccl
   nvmlDevice_t nvmlDev;
   if (wrapNvmlDeviceGetHandleByPciBusId(busId, &nvmlDev) != ncclSuccess) nvmlDev = NULL;
 
-	// todo: 创建gpu node, 填充gpu node的信息.
+	// todo: 在pci node基础上, 挂载gpu node->nvlink node.
   NCCLCHECK(ncclTopoGetXmlFromGpu(node, nvmlDev, xml, gpuNode));
   return ncclSuccess;
 }
@@ -724,10 +730,13 @@ ncclResult_t ncclTopoGetSubsystem(const char* sysPath, char* subSys) {
   return ncclSuccess;
 }
 
+// todo: 基于pciPath(可能是一个net设备), 其名字是netName, 建立: pci-> nic -> net.
 ncclResult_t ncclTopoFillNet(struct ncclXml* xml, const char* pciPath, const char* netName, struct ncclXmlNode** netNode) {
+	// todo: 最终目标net node, 节点名为net, name属性值为netName.
   NCCLCHECK(xmlFindTagKv(xml, "net", netNode, "name", netName));
   if (*netNode != NULL) return ncclSuccess;
 
+	// todo: pciPath对应的该设备, 不是真正的pci设备.
   const char* pciSysPath = pciPath;
   if (pciSysPath) {
     char subSystem[PATH_MAX];
@@ -739,6 +748,7 @@ ncclResult_t ncclTopoFillNet(struct ncclXml* xml, const char* pciPath, const cha
     }
   }
 
+	// todo: 建立pci node.
   struct ncclXmlNode* parent = NULL;
   if (pciSysPath) {
     int offset;
@@ -756,12 +766,14 @@ ncclResult_t ncclTopoFillNet(struct ncclXml* xml, const char* pciPath, const cha
     NCCLCHECK(xmlFindTag(xml, "cpu", &parent));
   }
 
+	// todo: pci下面建立nic node.
   struct ncclXmlNode* nicNode = NULL;
   NCCLCHECK(xmlGetSub(parent, "nic", &nicNode));
   if (nicNode == NULL) {
     NCCLCHECK(xmlAddNode(xml, parent, "nic", &nicNode));
   }
 
+	// todo: nic node下面建立net node.
   // We know that this net does not exist yet (we searched for it at the
   // beginning of this function), so we can add it.
   NCCLCHECK(xmlAddNode(xml, nicNode, "net", netNode));

@@ -523,9 +523,12 @@ ncclResult_t ncclTopoGetSystem(struct ncclComm* comm, struct ncclTopoSystem** sy
       char busId[NVML_DEVICE_PCI_BUS_ID_BUFFER_SIZE];
       NCCLCHECK(int64ToBusId(comm->peerInfo[r].busId, busId));
 
+			// todo: 返回建立的gpu node.
       struct ncclXmlNode* node;
       NCCLCHECK(ncclTopoFillGpu(xml, busId, &node));
       if (node == NULL) continue;
+
+			// todo: 设置gpu node的rank, gdr属性信息.
       NCCLCHECK(xmlSetAttrInt(node, "rank", r));
       NCCLCHECK(xmlInitAttrInt(node, "gdr", comm->peerInfo[r].gdrSupport));
     }
@@ -552,6 +555,7 @@ ncclResult_t ncclTopoGetSystem(struct ncclComm* comm, struct ncclTopoSystem** sy
   if (netDevCount == 0) {
     NCCLCHECK(ncclNetDevices(&netDevCount));
   }
+	// todo: host上找到若干张网卡, 将这些网卡添加到xml树上.
   for (int n=0; n<netDevCount; n++) {
     ncclNetProperties_t props;
     NCCLCHECK(ncclNetGetProperties(n, &props));
