@@ -736,7 +736,7 @@ ncclResult_t ncclTopoFillNet(struct ncclXml* xml, const char* pciPath, const cha
   NCCLCHECK(xmlFindTagKv(xml, "net", netNode, "name", netName));
   if (*netNode != NULL) return ncclSuccess;
 
-	// todo: pciPath对应的该设备, 不是真正的pci设备.
+	// todo: pciPath对应的设备, 排查是不是真正的pci设备?
   const char* pciSysPath = pciPath;
   if (pciSysPath) {
     char subSystem[PATH_MAX];
@@ -748,7 +748,6 @@ ncclResult_t ncclTopoFillNet(struct ncclXml* xml, const char* pciPath, const cha
     }
   }
 
-	// todo: 建立pci node.
   struct ncclXmlNode* parent = NULL;
   if (pciSysPath) {
     int offset;
@@ -757,13 +756,13 @@ ncclResult_t ncclTopoFillNet(struct ncclXml* xml, const char* pciPath, const cha
     strcpy(busId, pciSysPath+offset+1);
     NCCLCHECK(xmlFindTagKv(xml, "pci", &parent, "busid", busId));
     if (parent == NULL) {
-      NCCLCHECK(xmlAddNode(xml, NULL, "pci", &parent));
+      NCCLCHECK(xmlAddNode(xml, NULL, "pci", &parent));  // todo: 建立pci node, 并且插入到xml树中.
       NCCLCHECK(xmlSetAttr(parent, "busid", busId));
       NCCLCHECK(ncclTopoGetXmlFromSys(parent, xml));
     }
   } else {
     // Virtual NIC, no PCI device, attach to first CPU
-    NCCLCHECK(xmlFindTag(xml, "cpu", &parent));
+    NCCLCHECK(xmlFindTag(xml, "cpu", &parent));  // todo: 该pciPath对应的设备不是真正的pci设备, 将他挂在第一个cpuNode下面.
   }
 
 	// todo: pci下面建立nic node.
@@ -773,7 +772,7 @@ ncclResult_t ncclTopoFillNet(struct ncclXml* xml, const char* pciPath, const cha
     NCCLCHECK(xmlAddNode(xml, parent, "nic", &nicNode));
   }
 
-	// todo: nic node下面建立net node.
+	// todo: nic node下面建立net node, netNode的name属性值对应网卡的名字.
   // We know that this net does not exist yet (we searched for it at the
   // beginning of this function), so we can add it.
   NCCLCHECK(xmlAddNode(xml, nicNode, "net", netNode));

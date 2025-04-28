@@ -76,8 +76,8 @@ struct ncclTopoLinkList {
 #define NCCL_TOPO_UNDEF (-1)
 
 struct ncclTopoNode {
-  int type;
-  int64_t id;
+  int type;   // todo: 表示设备类型, cpu? gpu? net?
+  int64_t id;  // todo: numa id.
   // Type specific data
   union {
     struct {
@@ -95,7 +95,7 @@ struct ncclTopoNode {
       int maxChannels;
     }net;
     struct {
-      int arch;
+      int arch;  // todo: arch, vendor, model, 具体见graph.h中NCCL_TOPO_CPU...
       int vendor;
       int model;
       cpu_set_t affinity;
@@ -115,7 +115,7 @@ struct ncclTopoNodeSet {
 };
 
 struct ncclTopoSystem {
-  struct ncclTopoNodeSet nodes[NCCL_TOPO_NODE_TYPES];
+  struct ncclTopoNodeSet nodes[NCCL_TOPO_NODE_TYPES];  // todo: 维护每一类node的信息, 每一类node又是一个集合(里面包含了很多具体的node), 有GPU, CPU等node类型.
   float maxWidth;
 };
 

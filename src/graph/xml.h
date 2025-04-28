@@ -104,6 +104,7 @@ static ncclResult_t xmlGetAttrFloat(struct ncclXmlNode* node, const char* attrNa
   return ncclSuccess;
 }
 
+// todo: 从xml树上, 找到第一个name为tagname的node.
 static ncclResult_t xmlFindTag(struct ncclXml* xml, const char* tagName, struct ncclXmlNode** node) {
   *node = NULL;
   for (int i=0; i<xml->maxIndex; i++) {
@@ -227,6 +228,7 @@ struct kvDict {
   int value;
 };
 
+// todo: 从dict中查看str对应的内容.
 static ncclResult_t kvConvertToInt(const char* str, int* value, struct kvDict* dict) {
   struct kvDict* d = dict;
   while (d->str) {
